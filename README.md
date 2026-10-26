@@ -1,51 +1,84 @@
-# HireMatch: Job Portal & Applicant Tracking (MERN) - Phase 1 (~50%)
+# HireMatch — Job Portal & Applicant Tracking
 
-A two-sided job portal. The unique feature is the **Skill Match Ring**: every job shows
-how much of its skill list the logged-in candidate already has, plus a "skill gap" list.
-Recruiters see applicants ranked by the same score.
+HireMatch is a MERN-based job portal connecting candidates and recruiters. Its key feature, the **Skill Match Ring**, shows candidates their skill-match percentage and missing skills, while helping recruiters rank applicants by compatibility.
 
-## What is done in this phase
-- JWT auth with roles (candidate / recruiter)
-- Candidate skills profile
-- Faceted job search API (title, location, work mode, experience, CTC, skills) with pagination
-- Job posting and closing (recruiter, ownership enforced)
-- Apply with unique index (no duplicates), "My applications" tracker
-- Recruiter applicant list (owner only), ranked by match score
-- Stage changes with a server-side state machine
-- React UI that fetches and displays all of this from the API
+## ✨ Features
 
-## Left for phase 2
-Resume upload + signed URLs, admin panel, email notifications, recruiter notes,
-analytics aggregation, helmet / rate limiting / sanitize, deployment.
+- **Authentication:** JWT-based login and role-based access (Candidate / Recruiter).
+- **Candidate Profiles:** Manage skills and experience.
+- **Smart Job Search:** Filter by title, location, work mode, experience, CTC, and skills, with pagination.
+- **Skill Match Ring:** View match scores and skill gaps.
+- **Job Management:** Recruiters can post and close jobs, with ownership checks.
+- **Applications:** Apply for jobs, prevent duplicate applications, and track application status.
+- **Recruiter Dashboard:** View and rank applicants by skill-match score.
+- **Stage Management:** Server-side validation of application stage transitions.
 
-## Run it
-Requires Node 18+ and MongoDB (local or Atlas).
+## 🛠️ Tech Stack
 
-    # terminal 1: API
-    cd server
-    npm install
-    # edit .env: set MONGO_URI (Atlas string if not using local Mongo)
-    npm run seed      # demo data
-    npm run dev       # http://localhost:4000
+**MongoDB · Express.js · React · Node.js · JWT · Vite**
 
-    # terminal 2: UI
-    cd client
-    npm install
-    npm run dev       # http://localhost:5173
+## 🚀 Getting Started
 
-Demo logins (password `demo1234`): candidate@demo.com, recruiter@demo.com
+**Prerequisites:** Node.js 18+ and MongoDB (local or Atlas).
 
-## API summary
-| Method | Route | Who |
+### 1. Backend
+
+```bash
+cd server
+npm install
+```
+
+Configure `server/.env` with your MongoDB connection string (`MONGO_URI`) and required secrets.
+
+```bash
+npm run seed
+npm run dev
+```
+
+API: `http://localhost:4000`
+
+### 2. Frontend
+
+In a new terminal:
+
+```bash
+cd client
+npm install
+npm run dev
+```
+
+Frontend: `http://localhost:5173`
+
+## 🔑 Demo Accounts
+
+Both accounts use password `demo1234`.
+
+| Role | Email |
+|---|---|
+| Candidate | `candidate@demo.com` |
+| Recruiter | `recruiter@demo.com` |
+
+Run the seed script before using these accounts.
+
+## 🔌 API Overview
+
+| Method | Endpoint | Access |
 |---|---|---|
-| POST | /api/auth/register, /api/auth/login | public |
-| GET / PUT | /api/profile/me | candidate |
-| GET | /api/jobs?role=&location=&workMode=&minExp=&ctc=&skills=&page= | public (adds match if candidate) |
-| GET | /api/jobs/:id | public |
-| POST | /api/jobs | recruiter |
-| PATCH | /api/jobs/:id/close | owner recruiter |
-| GET | /api/jobs/mine | recruiter |
-| GET | /api/jobs/:id/applicants | owner recruiter |
-| POST | /api/applications | candidate |
-| GET | /api/applications/me | candidate |
-| PATCH | /api/applications/:id/stage | owner recruiter |
+| POST | `/api/auth/register` | Public |
+| POST | `/api/auth/login` | Public |
+| GET / PUT | `/api/profile/me` | Candidate |
+| GET | `/api/jobs` | Public |
+| GET | `/api/jobs/:id` | Public |
+| POST | `/api/jobs` | Recruiter |
+| PATCH | `/api/jobs/:id/close` | Job owner |
+| GET | `/api/jobs/mine` | Recruiter |
+| GET | `/api/jobs/:id/applicants` | Job owner |
+| POST | `/api/applications` | Candidate |
+| GET | `/api/applications/me` | Candidate |
+| PATCH | `/api/applications/:id/stage` | Job owner |
+
+Job search supports `role`, `location`, `workMode`, `minExp`, `ctc`, `skills`, and `page`.
+
+## 🗺️ Roadmap
+
+**Phase 2:** Resume uploads with signed URLs, admin panel, email notifications, recruiter notes, analytics, enhanced security (Helmet, rate limiting, sanitization), and deployment.
