@@ -2,7 +2,7 @@
 
 HireMatch is a MERN-based job portal connecting candidates and recruiters. Its key feature, the **Skill Match Ring**, shows candidates their skill-match percentage and missing skills, while helping recruiters rank applicants by compatibility.
 
-## ✨ Features
+##  Features
 
 - **Authentication:** JWT-based login and role-based access (Candidate / Recruiter).
 - **Candidate Profiles:** Manage skills and experience.
@@ -13,11 +13,11 @@ HireMatch is a MERN-based job portal connecting candidates and recruiters. Its k
 - **Recruiter Dashboard:** View and rank applicants by skill-match score.
 - **Stage Management:** Server-side validation of application stage transitions.
 
-## 🛠️ Tech Stack
+##  Tech Stack
 
 **MongoDB · Express.js · React · Node.js · JWT · Vite**
 
-## 🚀 Getting Started
+##  Getting Started
 
 **Prerequisites:** Node.js 18+ and MongoDB (local or Atlas).
 
@@ -49,7 +49,7 @@ npm run dev
 
 Frontend: `http://localhost:5173`
 
-## 🔑 Demo Accounts
+##  Demo Accounts
 
 Both accounts use password `demo1234`.
 
@@ -60,7 +60,7 @@ Both accounts use password `demo1234`.
 
 Run the seed script before using these accounts.
 
-## 🔌 API Overview
+##  API Overview
 
 | Method | Endpoint | Access |
 |---|---|---|
@@ -79,6 +79,6 @@ Run the seed script before using these accounts.
 
 Job search supports `role`, `location`, `workMode`, `minExp`, `ctc`, `skills`, and `page`.
 
-## 🗺️ Roadmap
+##  Roadmap
 
 **Phase 2:** Resume uploads with signed URLs, admin panel, email notifications, recruiter notes, analytics, enhanced security (Helmet, rate limiting, sanitization), and deployment.
