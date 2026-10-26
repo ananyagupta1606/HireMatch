@@ -10,12 +10,21 @@ const { TRANSITIONS } = require("../utils/stages");
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const getCandidateProfile = async (user) => {
-	if (user?.role !== "candidate") {
-		return null;
-	}
+    if (user?.role !== "candidate") {
+        return null;
+    }
 
-	return Profile.findOne({ userId: user._id }).lean();
+    const profile = await Profile.findOne({
+        userId: user._id,
+    }).lean();
+
+    // Treat candidates without a saved profile as freshers.
+    return profile || {
+        skills: [],
+        experienceYears: 0,
+    };
 };
+;
 
 // GET /api/jobs
 router.get(
