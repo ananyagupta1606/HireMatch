@@ -1058,3 +1058,25 @@ textarea:disabled {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* =========================
+   EXPERIENCE ELIGIBILITY
+========================= */
+
+.eligibility-warning {
+    margin: 16px 0;
+    padding: 16px;
+    border: 1px solid #f0c6a8;
+    border-radius: 10px;
+    background: #fff7ed;
+    color: #9a3412;
+}
+
+.eligibility-warning strong {
+    display: block;
+    margin-bottom: 8px;
+}
+
+.eligibility-warning p {
+    margin-bottom: 0;
+}

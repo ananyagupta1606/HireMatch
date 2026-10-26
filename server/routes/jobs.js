@@ -9,13 +9,15 @@ const { TRANSITIONS } = require("../utils/stages");
 
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const mySkillsOf = async (user) =>
-	user?.role === "candidate"
-		? (await Profile.findOne({ userId: user._id }).lean())?.skills || []
-		: null;
+const getCandidateProfile = async (user) => {
+	if (user?.role !== "candidate") {
+		return null;
+	}
 
-// GET /api/jobs?role=&location=&workMode=&minExp=&ctc=&skills=&page=
-// Search jobs, calculate candidate match scores, sort, and paginate.
+	return Profile.findOne({ userId: user._id }).lean();
+};
+
+// GET /api/jobs
 router.get(
 	"/",
 	optionalAuth,
@@ -31,47 +33,45 @@ router.get(
 		if (location) q.location = new RegExp(esc(location), "i");
 		if (workMode) q.workMode = workMode;
 
+		// Experience dropdown filters by the job's minimum requirement.
 		if (minExp !== undefined && minExp !== "") {
-			q.minExp = { $lte: +minExp };
+			q.minExp = { $gte: Number(minExp) };
 		}
 
 		if (ctc) {
-			q.ctcMax = { $gte: +ctc };
+			q.ctcMax = { $gte: Number(ctc) };
 		}
 
 		if (skills) {
 			q.skills = { $in: cleanSkills(skills) };
 		}
 
-		// Get the candidate's skills, if a candidate is logged in.
-		const mine = await mySkillsOf(req.user);
+		const profile = await getCandidateProfile(req.user);
+		const mine = profile?.skills || [];
 
-		// Fetch all jobs matching the filters before pagination.
 		let jobs = await Job.find(q).lean();
 
-		if (mine) {
-			// Calculate each job's match score.
+		if (profile) {
+			const candidateExperience = Number(profile.experienceYears ?? 0);
+
 			jobs = jobs.map((job) => ({
 				...job,
-				match: matchScore(job.skills, mine),
+				match: matchScore(job.skills || [], mine),
+				candidateExperience,
+				eligibleByExperience:
+					candidateExperience >= Number(job.minExp ?? 0),
 			}));
 
-			// Highest match score first.
-			// For equal scores, show newer jobs first.
 			jobs.sort(
 				(a, b) =>
 					b.match.score - a.match.score ||
 					new Date(b.createdAt) - new Date(a.createdAt),
 			);
 		} else {
-			// Guests and recruiters see newest jobs first.
 			jobs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 		}
 
-		// Calculate total results before pagination.
 		const total = jobs.length;
-
-		// Apply pagination after sorting.
 		const start = (page - 1) * limit;
 		const paginatedJobs = jobs.slice(start, start + limit);
 
@@ -85,19 +85,29 @@ router.get(
 );
 
 // GET /api/jobs/mine
-// Recruiter's own jobs and applicant counts.
 router.get(
 	"/mine",
 	protect,
 	allow("recruiter"),
 	wrap(async (req, res) => {
-		const jobs = await Job.find({ recruiter: req.user._id })
+		const jobs = await Job.find({
+			recruiter: req.user._id,
+		})
 			.sort({ createdAt: -1 })
 			.lean();
 
 		const counts = await Application.aggregate([
-			{ $match: { job: { $in: jobs.map((j) => j._id) } } },
-			{ $group: { _id: "$job", n: { $sum: 1 } } },
+			{
+				$match: {
+					job: { $in: jobs.map((j) => j._id) },
+				},
+			},
+			{
+				$group: {
+					_id: "$job",
+					n: { $sum: 1 },
+				},
+			},
 		]);
 
 		const map = Object.fromEntries(counts.map((c) => [String(c._id), c.n]));
@@ -112,7 +122,6 @@ router.get(
 );
 
 // GET /api/jobs/:id
-// Get one job and, for candidates, calculate its match score.
 router.get(
 	"/:id",
 	optionalAuth,
@@ -120,13 +129,22 @@ router.get(
 		const job = await Job.findById(req.params.id).lean();
 
 		if (!job) {
-			return res.status(404).json({ message: "Job not found" });
+			return res.status(404).json({
+				message: "Job not found",
+			});
 		}
 
-		const mine = await mySkillsOf(req.user);
+		const profile = await getCandidateProfile(req.user);
 
-		if (mine) {
-			job.match = matchScore(job.skills, mine);
+		if (profile) {
+			const candidateExperience = Number(profile.experienceYears ?? 0);
+
+			job.match = matchScore(job.skills || [], profile.skills || []);
+
+			job.candidateExperience = candidateExperience;
+
+			job.eligibleByExperience =
+				candidateExperience >= Number(job.minExp ?? 0);
 
 			job.applied = !!(await Application.exists({
 				job: job._id,
@@ -139,7 +157,6 @@ router.get(
 );
 
 // POST /api/jobs
-// Recruiters can create jobs.
 router.post(
 	"/",
 	protect,
@@ -170,9 +187,9 @@ router.post(
 			location,
 			workMode,
 			skills: cleanSkills(skills),
-			minExp: +minExp || 0,
-			ctcMin: +ctcMin || 0,
-			ctcMax: +ctcMax || 0,
+			minExp: Number(minExp) || 0,
+			ctcMin: Number(ctcMin) || 0,
+			ctcMax: Number(ctcMax) || 0,
 		});
 
 		res.status(201).json(job);
@@ -180,20 +197,24 @@ router.post(
 );
 
 // PATCH /api/jobs/:id/close
-// Only the recruiter who owns the job can close it.
 router.patch(
 	"/:id/close",
 	protect,
 	allow("recruiter"),
 	wrap(async (req, res) => {
 		const job = await Job.findOneAndUpdate(
-			{ _id: req.params.id, recruiter: req.user._id },
+			{
+				_id: req.params.id,
+				recruiter: req.user._id,
+			},
 			{ status: "closed" },
 			{ new: true },
 		);
 
 		if (!job) {
-			return res.status(404).json({ message: "Job not found" });
+			return res.status(404).json({
+				message: "Job not found",
+			});
 		}
 
 		res.json(job);
@@ -201,8 +222,6 @@ router.patch(
 );
 
 // GET /api/jobs/:id/applicants
-// Only the recruiter who owns the job can view its applicants.
-// Applicants are ranked by their match score.
 router.get(
 	"/:id/applicants",
 	protect,
@@ -214,14 +233,17 @@ router.get(
 		}).lean();
 
 		if (!job) {
-			return res.status(404).json({ message: "Job not found" });
+			return res.status(404).json({
+				message: "Job not found",
+			});
 		}
 
-		const apps = await Application.find({ job: job._id })
+		const apps = await Application.find({
+			job: job._id,
+		})
 			.populate("candidate", "name email")
 			.lean();
 
-		// Ignore applications whose candidate account no longer exists.
 		const validApps = apps.filter((a) => a.candidate);
 
 		const profiles = await Profile.find({
@@ -247,13 +269,16 @@ router.get(
 								experienceYears: p.experienceYears,
 							}
 						: null,
-					match: matchScore(job.skills, p?.skills || []),
+					match: matchScore(job.skills || [], p?.skills || []),
 					next: TRANSITIONS[a.stage] || [],
 				};
 			})
 			.sort((a, b) => b.match.score - a.match.score);
 
-		res.json({ job, applicants: list });
+		res.json({
+			job,
+			applicants: list,
+		});
 	}),
 );
 
