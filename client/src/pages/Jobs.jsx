@@ -8,37 +8,53 @@ const EMPTY = {
 	role: "",
 	location: "",
 	workMode: "",
-	minExp: "",
+	experienceLevel: "",
 	ctc: "",
 	skills: "",
 };
 
 export default function Jobs() {
 	const { user } = useAuth();
+
 	const [form, setForm] = useState(EMPTY);
 	const [filters, setFilters] = useState(EMPTY);
 	const [page, setPage] = useState(1);
+
 	const [data, setData] = useState({
 		jobs: [],
 		total: 0,
 		pages: 1,
+		page: 1,
 	});
+
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState("");
 
-	const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+	const set = (key) => (e) => {
+		setForm((prev) => ({
+			...prev,
+			[key]: e.target.value,
+		}));
+	};
 
 	// Fetch jobs whenever filters, page, or user changes.
 	useEffect(() => {
 		setLoading(true);
 		setError("");
 
+		// Convert the experience dropdown into the existing minExp API parameter.
+		const { experienceLevel, ...otherFilters } = filters;
+
 		const params = Object.fromEntries(
-			Object.entries({ ...filters, page }).filter(([, v]) => v !== ""),
+			Object.entries({
+				...otherFilters,
+				minExp: experienceLevel,
+				page,
+			}).filter(([, value]) => value !== ""),
 		);
 
 		api.get("/jobs", { params })
-			.then((r) => setData(r.data))
+			.then((response) => setData(response.data))
 			.catch((e) => setError(errMsg(e)))
 			.finally(() => setLoading(false));
 	}, [filters, page, user]);
@@ -46,7 +62,7 @@ export default function Jobs() {
 	const search = (e) => {
 		e.preventDefault();
 		setPage(1);
-		setFilters(form);
+		setFilters({ ...form });
 	};
 
 	const reset = () => {
@@ -94,13 +110,19 @@ export default function Jobs() {
 					<option value="remote">Remote</option>
 				</select>
 
-				<input
-					type="number"
-					min="0"
-					placeholder="My experience (yrs)"
-					value={form.minExp}
-					onChange={set("minExp")}
-				/>
+				{/* Separate experience-level filter */}
+				<select
+					value={form.experienceLevel}
+					onChange={set("experienceLevel")}
+				>
+					<option value="">All experience levels</option>
+					<option value="0">Fresher (0+ years required)</option>
+					<option value="1">1+ years required</option>
+					<option value="2">2+ years required</option>
+					<option value="3">3+ years required</option>
+					<option value="4">4+ years required</option>
+					<option value="5">5+ years required</option>
+				</select>
 
 				<input
 					type="number"
@@ -116,7 +138,9 @@ export default function Jobs() {
 					onChange={set("skills")}
 				/>
 
-				<button className="btn">Search</button>
+				<button type="submit" className="btn">
+					Search
+				</button>
 
 				<button type="button" className="link" onClick={reset}>
 					Clear
@@ -139,28 +163,30 @@ export default function Jobs() {
 
 					{/* Backend returns jobs in the correct order */}
 					<div className="grid">
-						{data.jobs.map((j) => (
-							<JobCard key={j._id} job={j} />
+						{data.jobs.map((job) => (
+							<JobCard key={job._id} job={job} />
 						))}
 					</div>
 
 					<div className="pager">
 						<button
+							type="button"
 							className="btn ghost"
 							disabled={page <= 1}
-							onClick={() => setPage(page - 1)}
+							onClick={() => setPage((prev) => prev - 1)}
 						>
 							Previous
 						</button>
 
 						<span>
-							Page {data.page} of {data.pages}
+							Page {data.page || page} of {data.pages}
 						</span>
 
 						<button
+							type="button"
 							className="btn ghost"
 							disabled={page >= data.pages}
-							onClick={() => setPage(page + 1)}
+							onClick={() => setPage((prev) => prev + 1)}
 						>
 							Next
 						</button>
