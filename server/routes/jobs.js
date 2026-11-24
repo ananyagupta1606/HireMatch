@@ -1,6 +1,7 @@
 const router = require("express").Router();
 const Job = require("../models/Job");
 const Application = require("../models/Application");
+const RecruiterNote = require("../models/RecruiterNote");
 const Profile = require("../models/CandidateProfile");
 const wrap = require("../utils/wrap");
 const { protect, optionalAuth, allow } = require("../middleware/auth");
@@ -260,9 +261,16 @@ router.get(
 				$in: validApps.map((a) => a.candidate._id),
 			},
 		}).lean();
+		const notes = await RecruiterNote.find({
+			application: { $in: validApps.map((app) => app._id) },
+			recruiter: req.user._id,
+		}).lean();
 
 		const byUser = Object.fromEntries(
 			profiles.map((p) => [String(p.userId), p]),
+		);
+		const noteByApplication = Object.fromEntries(
+			notes.map((note) => [String(note.application), note.note]),
 		);
 
 		const list = validApps
@@ -271,6 +279,7 @@ router.get(
 
 				return {
 					...a,
+					privateNote: noteByApplication[String(a._id)] || "",
 					profile: p
 						? {
 								headline: p.headline,

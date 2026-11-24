@@ -1,6 +1,7 @@
 const router = require("express").Router();
 
 const Application = require("../models/Application");
+const RecruiterNote = require("../models/RecruiterNote");
 const Job = require("../models/Job");
 const Profile = require("../models/CandidateProfile");
 
@@ -144,6 +145,53 @@ router.get(
 		}
 
 		await pipeline(await cloudinary.downloadResume(resume), res);
+	}),
+);
+
+// PUT /api/applications/:id/private-note
+// Recruiters can save private notes only for applicants to their own jobs.
+router.put(
+	"/:id/private-note",
+	protect,
+	allow("recruiter"),
+	wrap(async (req, res) => {
+		const application = await Application.findById(req.params.id).populate(
+			"job",
+			"recruiter",
+		);
+
+		if (
+			!application ||
+			!application.job ||
+			!application.job.recruiter.equals(req.user._id)
+		) {
+			return res.status(404).json({
+				message: "Application not found",
+			});
+		}
+
+		if (typeof req.body.note !== "string" || req.body.note.length > 2000) {
+			return res.status(400).json({
+				message: "Private note must be text no longer than 2000 characters.",
+			});
+		}
+
+		const note = req.body.note.trim();
+		if (!note) {
+			await RecruiterNote.deleteOne({
+				application: application._id,
+				recruiter: req.user._id,
+			});
+			return res.json({ note: "" });
+		}
+
+		const saved = await RecruiterNote.findOneAndUpdate(
+			{ application: application._id, recruiter: req.user._id },
+			{ note },
+			{ new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true },
+		);
+
+		res.json({ note: saved.note });
 	}),
 );
 

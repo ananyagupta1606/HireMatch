@@ -80,6 +80,7 @@ Run the seed script before using these accounts.
 | POST | `/api/profile/resume` | Candidate |
 | GET | `/api/profile/resume` | Candidate |
 | DELETE | `/api/profile/resume` | Candidate |
+| PUT | `/api/applications/:id/private-note` | Recruiter (own job applicants) |
 | GET | `/api/jobs` | Public |
 | GET | `/api/jobs/:id` | Public |
 | POST | `/api/jobs` | Recruiter |

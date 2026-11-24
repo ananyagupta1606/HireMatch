@@ -9,8 +9,15 @@ export default function Applicants() {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [resumeAction, setResumeAction] = useState(null);
+  const [notes, setNotes] = useState({});
+  const [savingNoteId, setSavingNoteId] = useState(null);
 
-  const load = () => api.get(`/jobs/${id}/applicants`).then((r) => setData(r.data)).catch((e) => setError(errMsg(e)));
+  const load = () => api.get(`/jobs/${id}/applicants`).then((r) => {
+    setData(r.data);
+    setNotes(Object.fromEntries(
+      r.data.applicants.map((applicant) => [applicant._id, applicant.privateNote || ''])
+    ));
+  }).catch((e) => setError(errMsg(e)));
   useEffect(() => { load(); }, [id]);
 
   const move = async (appId, stage) => {
@@ -50,6 +57,23 @@ export default function Applicants() {
       setError(errMsg(e));
     } finally {
       setResumeAction(null);
+    }
+  };
+
+  const savePrivateNote = async (applicationId) => {
+    setSavingNoteId(applicationId);
+    setError('');
+
+    try {
+      const { data: result } = await api.put(
+        `/applications/${applicationId}/private-note`,
+        { note: notes[applicationId] || '' },
+      );
+      setNotes((current) => ({ ...current, [applicationId]: result.note }));
+    } catch (e) {
+      setError(errMsg(e));
+    } finally {
+      setSavingNoteId(null);
     }
   };
 
@@ -99,6 +123,31 @@ export default function Applicants() {
                 </div>
               </div>
             )}
+            <div className="profile-label">
+              <label htmlFor={`private-note-${a._id}`}>Recruiter Notes</label>
+              <textarea
+                id={`private-note-${a._id}`}
+                rows="3"
+                maxLength="2000"
+                value={notes[a._id] || ''}
+                onChange={(e) => setNotes((current) => ({
+                  ...current,
+                  [a._id]: e.target.value,
+                }))}
+                placeholder="Add private notes about this applicant..."
+              />
+              <span className="field-hint">
+                Only you can see these notes. Maximum 2000 characters.
+              </span>
+              <button
+                type="button"
+                className="btn ghost small"
+                onClick={() => savePrivateNote(a._id)}
+                disabled={savingNoteId === a._id}
+              >
+                {savingNoteId === a._id ? 'Saving note...' : 'Save private note'}
+              </button>
+            </div>
             <StageBar stage={a.stage} />
           </div>
           <div className="actions">
