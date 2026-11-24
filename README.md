@@ -6,7 +6,7 @@ HireMatch is a MERN-based job portal connecting candidates and recruiters. Its k
 
 - **Authentication:** JWT-based login and role-based access (Candidate / Recruiter).
 - **Candidate Profiles:** Manage skills and experience.
-- **Resume Uploads:** Candidates can upload, replace, and download a private PDF, DOC, or DOCX resume (up to 5 MB).
+- **Resume Uploads:** Candidates can upload, replace, download, and remove a private PDF, DOC, or DOCX resume (up to 5 MB).
 - **Smart Job Search:** Filter by title, location, work mode, experience, CTC, and skills, with pagination.
 - **Skill Match Ring:** View match scores and skill gaps.
 - **Job Management:** Recruiters can post and close jobs, with ownership checks.
@@ -79,6 +79,7 @@ Run the seed script before using these accounts.
 | GET / PUT | `/api/profile/me` | Candidate |
 | POST | `/api/profile/resume` | Candidate |
 | GET | `/api/profile/resume` | Candidate |
+| DELETE | `/api/profile/resume` | Candidate |
 | GET | `/api/jobs` | Public |
 | GET | `/api/jobs/:id` | Public |
 | POST | `/api/jobs` | Recruiter |

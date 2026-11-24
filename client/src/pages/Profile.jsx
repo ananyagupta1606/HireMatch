@@ -44,6 +44,7 @@ export default function Profile() {
   const [selectedResume, setSelectedResume] = useState(null);
   const [uploadingResume, setUploadingResume] = useState(false);
   const [downloadingResume, setDownloadingResume] = useState(false);
+  const [removingResume, setRemovingResume] = useState(false);
   const resumeInput = useRef(null);
 
   const categories = ['All', ...Object.keys(SKILL_CATEGORIES)];
@@ -190,6 +191,23 @@ export default function Profile() {
     }
   };
 
+  const removeResume = async () => {
+    if (!window.confirm('Remove your uploaded resume?')) return;
+
+    setRemovingResume(true);
+    setMsg({ type: '', text: '' });
+
+    try {
+      await api.delete('/profile/resume');
+      setResume(null);
+      setMsg({ type: 'ok', text: 'Resume removed successfully.' });
+    } catch (err) {
+      setMsg({ type: 'error', text: errMsg(err) });
+    } finally {
+      setRemovingResume(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="profile-loading">
@@ -285,14 +303,24 @@ export default function Profile() {
               <span>
                 Current resume: <strong>{resume.originalName}</strong>
               </span>
-              <button
-                type="button"
-                className="btn ghost small"
-                onClick={downloadResume}
-                disabled={downloadingResume}
-              >
-                {downloadingResume ? 'Downloading...' : 'Download'}
-              </button>
+              <div className="actions">
+                <button
+                  type="button"
+                  className="btn ghost small"
+                  onClick={downloadResume}
+                  disabled={downloadingResume || removingResume}
+                >
+                  {downloadingResume ? 'Downloading...' : 'Download'}
+                </button>
+                <button
+                  type="button"
+                  className="btn danger small"
+                  onClick={removeResume}
+                  disabled={removingResume || uploadingResume}
+                >
+                  {removingResume ? 'Removing...' : 'Remove'}
+                </button>
+              </div>
             </div>
           )}
 
@@ -314,7 +342,7 @@ export default function Profile() {
             type="button"
             className="profile-save-button resume-upload-button"
             onClick={uploadResume}
-            disabled={uploadingResume || !selectedResume}
+            disabled={uploadingResume || removingResume || !selectedResume}
           >
             {uploadingResume ? 'Uploading resume...' : 'Upload resume'}
           </button>
