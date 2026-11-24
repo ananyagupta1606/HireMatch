@@ -6,6 +6,7 @@ HireMatch is a MERN-based job portal connecting candidates and recruiters. Its k
 
 - **Authentication:** JWT-based login and role-based access (Candidate / Recruiter).
 - **Candidate Profiles:** Manage skills and experience.
+- **Resume Uploads:** Candidates can upload, replace, and download a private PDF, DOC, or DOCX resume (up to 5 MB).
 - **Smart Job Search:** Filter by title, location, work mode, experience, CTC, and skills, with pagination.
 - **Skill Match Ring:** View match scores and skill gaps.
 - **Job Management:** Recruiters can post and close jobs, with ownership checks.
@@ -29,6 +30,15 @@ npm install
 ```
 
 Configure `server/.env` with your MongoDB connection string (`MONGO_URI`) and required secrets.
+Add your Cloudinary credentials to `server/.env` for resume uploads:
+
+```env
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+```
+
+Keep the API secret on the server; do not put it in the client or commit it to GitHub.
 
 ```bash
 npm run seed
@@ -67,6 +77,8 @@ Run the seed script before using these accounts.
 | POST | `/api/auth/register` | Public |
 | POST | `/api/auth/login` | Public |
 | GET / PUT | `/api/profile/me` | Candidate |
+| POST | `/api/profile/resume` | Candidate |
+| GET | `/api/profile/resume` | Candidate |
 | GET | `/api/jobs` | Public |
 | GET | `/api/jobs/:id` | Public |
 | POST | `/api/jobs` | Recruiter |
@@ -79,6 +91,8 @@ Run the seed script before using these accounts.
 
 Job search supports `role`, `location`, `workMode`, `minExp`, `ctc`, `skills`, and `page`.
 
+Resume files are stored as private authenticated assets in Cloudinary. Configure `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` in `server/.env`; never expose the API secret to the client.
+
 ##  Roadmap
 
-**Phase 2:** Resume uploads with signed URLs, admin panel, email notifications, recruiter notes, analytics, enhanced security (Helmet, rate limiting, sanitization), and deployment.
+**Phase 2:** Admin panel, email notifications, recruiter notes, analytics, enhanced security (Helmet, rate limiting, sanitization), and deployment.

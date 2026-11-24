@@ -513,6 +513,34 @@ textarea:disabled {
   border-top: 1px solid #edf1ef;
 }
 
+.resume-current {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 18px;
+	padding: 12px 14px;
+	border: 1px solid var(--line);
+	border-radius: 9px;
+	color: var(--muted);
+	font-size: 13px;
+	overflow-wrap: anywhere;
+}
+
+.resume-current strong {
+	color: var(--ink);
+}
+
+.resume-upload-label input {
+	padding: 0.55rem;
+	font-size: 13px;
+}
+
+.resume-upload-button {
+	min-height: 40px;
+	margin-top: 8px;
+}
+
 .section-heading {
   display: flex;
   align-items: flex-start;
@@ -1019,6 +1047,11 @@ textarea:disabled {
 
   .profile-save-button {
     width: 100%;
+  }
+
+  .resume-current {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .skill-categories {

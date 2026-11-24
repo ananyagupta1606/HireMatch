@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import api, { errMsg } from '../api.js';
 
 const SKILL_CATEGORIES = {
@@ -40,6 +40,11 @@ export default function Profile() {
   const [msg, setMsg] = useState({ type: '', text: '' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [resume, setResume] = useState(null);
+  const [selectedResume, setSelectedResume] = useState(null);
+  const [uploadingResume, setUploadingResume] = useState(false);
+  const [downloadingResume, setDownloadingResume] = useState(false);
+  const resumeInput = useRef(null);
 
   const categories = ['All', ...Object.keys(SKILL_CATEGORIES)];
 
@@ -52,6 +57,7 @@ export default function Profile() {
           experienceYears: data.experienceYears ?? 0,
           expectedCtc: data.expectedCtc ?? 0,
         });
+        setResume(data.resume || null);
       })
       .catch((err) => {
         setMsg({ type: 'error', text: errMsg(err) });
@@ -141,6 +147,49 @@ export default function Profile() {
     }
   };
 
+  const uploadResume = async () => {
+    if (!selectedResume) {
+      setMsg({ type: 'error', text: 'Choose a PDF, DOC, or DOCX resume to upload.' });
+      return;
+    }
+
+    setUploadingResume(true);
+    setMsg({ type: '', text: '' });
+
+    try {
+      const formData = new FormData();
+      formData.append('resume', selectedResume);
+      const { data } = await api.post('/profile/resume', formData);
+      setResume(data.resume);
+      setSelectedResume(null);
+      if (resumeInput.current) resumeInput.current.value = '';
+      setMsg({ type: 'ok', text: 'Resume uploaded successfully.' });
+    } catch (err) {
+      setMsg({ type: 'error', text: errMsg(err) });
+    } finally {
+      setUploadingResume(false);
+    }
+  };
+
+  const downloadResume = async () => {
+    setDownloadingResume(true);
+    setMsg({ type: '', text: '' });
+
+    try {
+      const { data } = await api.get('/profile/resume', { responseType: 'blob' });
+      const url = URL.createObjectURL(data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = resume.originalName;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    } catch (err) {
+      setMsg({ type: 'error', text: errMsg(err) });
+    } finally {
+      setDownloadingResume(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="profile-loading">
@@ -221,6 +270,54 @@ export default function Profile() {
               </div>
             </label>
           </div>
+        </section>
+
+        <section className="profile-section">
+          <div className="section-heading">
+            <div>
+              <h2>Your resume</h2>
+              <p>Upload a PDF, DOC, or DOCX file (maximum 5 MB).</p>
+            </div>
+          </div>
+
+          {resume && (
+            <div className="resume-current">
+              <span>
+                Current resume: <strong>{resume.originalName}</strong>
+              </span>
+              <button
+                type="button"
+                className="btn ghost small"
+                onClick={downloadResume}
+                disabled={downloadingResume}
+              >
+                {downloadingResume ? 'Downloading...' : 'Download'}
+              </button>
+            </div>
+          )}
+
+          <label className="profile-label resume-upload-label">
+            {resume ? 'Choose a replacement resume' : 'Choose a resume'}
+            <input
+              ref={resumeInput}
+              type="file"
+              accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              onChange={(e) => setSelectedResume(e.target.files?.[0] || null)}
+            />
+          </label>
+
+          {selectedResume && (
+            <p className="field-hint">Selected: {selectedResume.name}</p>
+          )}
+
+          <button
+            type="button"
+            className="profile-save-button resume-upload-button"
+            onClick={uploadResume}
+            disabled={uploadingResume || !selectedResume}
+          >
+            {uploadingResume ? 'Uploading resume...' : 'Upload resume'}
+          </button>
         </section>
 
         <section className="profile-section">
