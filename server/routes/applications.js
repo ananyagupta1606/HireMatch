@@ -7,6 +7,8 @@ const Profile = require("../models/CandidateProfile");
 const wrap = require("../utils/wrap");
 const { protect, allow } = require("../middleware/auth");
 const { TRANSITIONS } = require("../utils/stages");
+const { pipeline } = require("stream/promises");
+const cloudinary = require("../services/cloudinary");
 
 // POST /api/applications
 // Candidates can apply only if they meet the job's experience requirement.
@@ -87,6 +89,61 @@ router.get(
 			.lean();
 
 		res.json(apps);
+	}),
+);
+
+// GET /api/applications/:id/resume
+// Recruiters can view resumes only for applicants to their own jobs.
+router.get(
+	"/:id/resume",
+	protect,
+	allow("recruiter"),
+	wrap(async (req, res) => {
+		const application = await Application.findById(req.params.id).populate(
+			"job",
+			"recruiter",
+		);
+
+		if (
+			!application ||
+			!application.job ||
+			!application.job.recruiter.equals(req.user._id)
+		) {
+			return res.status(404).json({
+				message: "Application not found",
+			});
+		}
+
+		if (!cloudinary.isConfigured()) {
+			return res.status(503).json({
+				message: "Resume storage is not configured.",
+			});
+		}
+
+		const profile = await Profile.findOne({
+			userId: application.candidate,
+		})
+			.select("resume")
+			.lean();
+		const resume = profile?.resume;
+
+		if (!resume?.publicId) {
+			return res.status(404).json({
+				message: "This candidate has not uploaded a resume.",
+			});
+		}
+
+		res.type(resume.mimeType || "application/octet-stream");
+		if (req.query.download === "true") {
+			res.attachment(resume.originalName);
+		} else {
+			res.set("Content-Disposition", "inline");
+		}
+		if (resume.size) {
+			res.set("Content-Length", String(resume.size));
+		}
+
+		await pipeline(await cloudinary.downloadResume(resume), res);
 	}),
 );
 

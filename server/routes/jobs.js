@@ -276,6 +276,9 @@ router.get(
 								headline: p.headline,
 								skills: p.skills,
 								experienceYears: p.experienceYears,
+								resume: p.resume
+									? { originalName: p.resume.originalName }
+									: null,
 							}
 						: null,
 					match: matchScore(job.skills || [], p?.skills || []),
