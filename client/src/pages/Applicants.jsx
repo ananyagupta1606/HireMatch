@@ -21,6 +21,7 @@ export default function Applicants() {
   useEffect(() => { load(); }, [id]);
 
   const move = async (appId, stage) => {
+    setError('');
     try { await api.patch(`/applications/${appId}/stage`, { stage }); load(); }
     catch (e) { setError(errMsg(e)); }
   };
@@ -77,13 +78,15 @@ export default function Applicants() {
     }
   };
 
-  if (error) return <p className="error">{error}</p>;
-  if (!data) return <p className="muted">Loading…</p>;
+  if (!data) return error
+    ? <p className="error" role="alert">{error}</p>
+    : <p className="muted">Loading…</p>;
   return (
     <>
       <Link to="/dashboard">← Back to dashboard</Link>
       <h1>{data.job.title}: applicants</h1>
-      <p className="muted">Ranked by how well their skills cover the job ({data.job.skills.join(', ')}).</p>
+      {error && <p className="error" role="alert">{error}</p>}
+      {/* <p className="muted">Ranked by how well their skills cover the job ({data.job.skills.join(', ')}).</p> */}
       {data.applicants.length === 0 && <p>No applications yet.</p>}
       {data.applicants.map((a) => (
         <div className="card applicant" key={a._id}>

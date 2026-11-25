@@ -208,6 +208,41 @@ textarea:disabled {
 	cursor: not-allowed;
 }
 
+.password-input {
+	position: relative;
+	margin-top: 0.35rem;
+}
+
+.password-input input {
+	margin: 0;
+	padding-right: 4.5rem;
+}
+
+.password-toggle {
+	position: absolute;
+	top: 50%;
+	right: 0.75rem;
+	display: grid;
+	place-items: center;
+	transform: translateY(-50%);
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: var(--brand);
+	cursor: pointer;
+	opacity: 0.6;
+	transition: opacity 0.2s;
+}
+
+.password-toggle:hover:not(:disabled) {
+	opacity: 1;
+}
+
+.password-toggle:disabled {
+	cursor: not-allowed;
+	opacity: 0.5;
+}
+
 /* =========================
    BUTTONS
 ========================= */

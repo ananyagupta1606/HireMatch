@@ -53,14 +53,7 @@ export default function App() {
 						}
 					/>
 
-					<Route
-						path="/jobs/:id"
-						element={
-							<Guard role="candidate">
-								<JobDetail />
-							</Guard>
-						}
-					/>
+					<Route path="/jobs/:id" element={<JobDetail />} />
 
 					<Route
 						path="/profile"
