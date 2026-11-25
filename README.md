@@ -9,10 +9,11 @@ HireMatch is a MERN-based job portal connecting candidates and recruiters. Its k
 - **Resume Uploads:** Candidates can upload, replace, download, and remove a private PDF, DOC, or DOCX resume (up to 5 MB).
 - **Smart Job Search:** Filter by title, location, work mode, experience, CTC, and skills, with pagination.
 - **Skill Match Ring:** View match scores and skill gaps.
-- **Job Management:** Recruiters can post and close jobs, with ownership checks.
+- **Job Management:** Recruiters can post, edit, close, reopen, and archive jobs, with ownership checks. Archiving hides a job while preserving applicant records.
 - **Applications:** Apply for jobs, prevent duplicate applications, and track application status.
 - **In-app notifications:** Get bell alerts for jobs matching your profile skills, new applications, and application-stage updates. No email notifications are sent.
 - **Recruiter Dashboard:** View and rank applicants by skill-match score.
+- **Applicant management:** Filter/search and sort candidates, track stage totals, and schedule interviews with in-app candidate notifications.
 - **Stage Management:** Server-side validation of application stage transitions.
 
 ##  Tech Stack
@@ -85,12 +86,16 @@ Run the seed script before using these accounts.
 | GET | `/api/jobs` | Public |
 | GET | `/api/jobs/:id` | Public |
 | POST | `/api/jobs` | Recruiter |
+| PATCH | `/api/jobs/:id` | Job owner |
 | PATCH | `/api/jobs/:id/close` | Job owner |
+| PATCH | `/api/jobs/:id/reopen` | Job owner |
+| DELETE | `/api/jobs/:id` | Job owner (archives job) |
 | GET | `/api/jobs/mine` | Recruiter |
 | GET | `/api/jobs/:id/applicants` | Job owner |
 | POST | `/api/applications` | Candidate |
 | GET | `/api/applications/me` | Candidate |
 | PATCH | `/api/applications/:id/stage` | Job owner |
+| PATCH | `/api/applications/:id/interview` | Job owner |
 | GET | `/api/notifications` | Authenticated user |
 | PATCH | `/api/notifications/:id/read` | Notification owner |
 | PATCH | `/api/notifications/read-all` | Authenticated user |

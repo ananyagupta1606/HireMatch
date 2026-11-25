@@ -7,7 +7,7 @@ const Profile = require("../models/CandidateProfile");
 const wrap = require("../utils/wrap");
 const { protect, optionalAuth, allow } = require("../middleware/auth");
 const { matchScore, cleanSkills } = require("../utils/match");
-const { TRANSITIONS } = require("../utils/stages");
+const { STAGES, TRANSITIONS } = require("../utils/stages");
 
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -103,6 +103,7 @@ router.get(
 	wrap(async (req, res) => {
 		const jobs = await Job.find({
 			recruiter: req.user._id,
+			status: { $ne: "archived" },
 		})
 			.sort({ createdAt: -1 })
 			.lean();
@@ -116,17 +117,33 @@ router.get(
 			{
 				$group: {
 					_id: "$job",
-					n: { $sum: 1 },
+					applicants: { $sum: 1 },
+					...Object.fromEntries(
+						STAGES.map((stage) => [
+							stage,
+							{
+								$sum: {
+									$cond: [{ $eq: ["$stage", stage] }, 1, 0],
+								},
+							},
+						]),
+					),
 				},
 			},
 		]);
 
-		const map = Object.fromEntries(counts.map((c) => [String(c._id), c.n]));
+		const map = Object.fromEntries(counts.map((count) => [String(count._id), count]));
 
 		res.json(
 			jobs.map((j) => ({
 				...j,
-				applicants: map[String(j._id)] || 0,
+				applicants: map[String(j._id)]?.applicants || 0,
+				stageCounts: Object.fromEntries(
+					STAGES.map((stage) => [
+						stage,
+						map[String(j._id)]?.[stage] || 0,
+					]),
+				),
 			})),
 		);
 	}),
@@ -139,7 +156,7 @@ router.get(
 	wrap(async (req, res) => {
 		const job = await Job.findById(req.params.id).lean();
 
-		if (!job) {
+		if (!job || job.status === "archived") {
 			return res.status(404).json({
 				message: "Job not found",
 			});
@@ -227,6 +244,95 @@ router.post(
 	}),
 );
 
+// PATCH /api/jobs/:id
+// Recruiters can edit their own job postings.
+router.patch(
+	"/:id",
+	protect,
+	allow("recruiter"),
+	wrap(async (req, res) => {
+		const job = await Job.findOne({
+			_id: req.params.id,
+			recruiter: req.user._id,
+		});
+
+		if (!job || job.status === "archived") {
+			return res.status(404).json({
+				message: "Job not found",
+			});
+		}
+
+		const updates = {};
+		for (const field of ["title", "description", "location"]) {
+			if (req.body[field] === undefined) continue;
+			if (
+				typeof req.body[field] !== "string" ||
+				!req.body[field].trim()
+			) {
+				return res.status(400).json({
+					message: `${field[0].toUpperCase()}${field.slice(1)} is required`,
+				});
+			}
+			updates[field] = req.body[field].trim();
+		}
+
+		if (req.body.skills !== undefined) {
+			if (
+				(typeof req.body.skills !== "string" &&
+					!Array.isArray(req.body.skills)) ||
+				(Array.isArray(req.body.skills) &&
+					!req.body.skills.every((skill) => typeof skill === "string"))
+			) {
+				return res.status(400).json({
+					message: "Skills must be a list or comma-separated text",
+				});
+			}
+			updates.skills = cleanSkills(req.body.skills);
+		}
+
+		if (req.body.workMode !== undefined) {
+			if (!["onsite", "remote", "hybrid"].includes(req.body.workMode)) {
+				return res.status(400).json({
+					message: "Choose onsite, remote, or hybrid work mode",
+				});
+			}
+			updates.workMode = req.body.workMode;
+		}
+
+		for (const field of ["minExp", "ctcMin", "ctcMax"]) {
+			if (req.body[field] === undefined) continue;
+			const value = Number(req.body[field]);
+			if (
+				req.body[field] === null ||
+				req.body[field] === "" ||
+				!Number.isFinite(value) ||
+				value < 0
+			) {
+				return res.status(400).json({
+					message: `${field} must be a non-negative number`,
+				});
+			}
+			updates[field] = value;
+		}
+
+		const nextCtcMin = updates.ctcMin ?? job.ctcMin;
+		const nextCtcMax = updates.ctcMax ?? job.ctcMax;
+		if (
+			(updates.ctcMin !== undefined || updates.ctcMax !== undefined) &&
+			nextCtcMin > nextCtcMax
+		) {
+			return res.status(400).json({
+				message: "Minimum CTC cannot exceed maximum CTC",
+			});
+		}
+
+		Object.assign(job, updates);
+		await job.save();
+
+		res.json(job);
+	}),
+);
+
 // PATCH /api/jobs/:id/close
 router.patch(
 	"/:id/close",
@@ -237,6 +343,7 @@ router.patch(
 			{
 				_id: req.params.id,
 				recruiter: req.user._id,
+				status: "open",
 			},
 			{ status: "closed" },
 			{ new: true },
@@ -249,6 +356,59 @@ router.patch(
 		}
 
 		res.json(job);
+	}),
+);
+
+// PATCH /api/jobs/:id/reopen
+router.patch(
+	"/:id/reopen",
+	protect,
+	allow("recruiter"),
+	wrap(async (req, res) => {
+		const job = await Job.findOneAndUpdate(
+			{
+				_id: req.params.id,
+				recruiter: req.user._id,
+				status: "closed",
+			},
+			{ status: "open" },
+			{ new: true, runValidators: true },
+		);
+
+		if (!job) {
+			return res.status(404).json({
+				message: "Closed job not found",
+			});
+		}
+
+		res.json(job);
+	}),
+);
+
+// DELETE /api/jobs/:id
+// Archive the posting while preserving applications and their history.
+router.delete(
+	"/:id",
+	protect,
+	allow("recruiter"),
+	wrap(async (req, res) => {
+		const job = await Job.findOneAndUpdate(
+			{
+				_id: req.params.id,
+				recruiter: req.user._id,
+				status: { $in: ["open", "closed"] },
+			},
+			{ status: "archived" },
+			{ new: true, runValidators: true },
+		);
+
+		if (!job) {
+			return res.status(404).json({
+				message: "Job not found",
+			});
+		}
+
+		res.json({ message: "Job archived. Applicant records were preserved." });
 	}),
 );
 

@@ -20,7 +20,11 @@ const jobSchema = new Schema(
 		minExp: { type: Number, default: 0 },
 		ctcMin: { type: Number, default: 0 }, // LPA
 		ctcMax: { type: Number, default: 0 },
-		status: { type: String, enum: ["open", "closed"], default: "open" },
+		status: {
+			type: String,
+			enum: ["open", "closed", "archived"],
+			default: "open",
+		},
 	},
 	{ timestamps: true },
 );

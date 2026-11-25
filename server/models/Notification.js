@@ -15,6 +15,7 @@ const notificationSchema = new Schema(
 				"application_received",
 				"application_status",
 				"interview_set",
+				"interview_scheduled",
 			],
 			required: true,
 		},

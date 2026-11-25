@@ -22,6 +22,11 @@ export default function MyApplications() {
           <div>
             <Link to={`/jobs/${a.job._id}`}><strong>{a.job.title}</strong></Link>
             <p className="muted">{a.job.company} · {a.job.location} · applied {new Date(a.createdAt).toLocaleDateString()}</p>
+            {a.interviewAt && (
+              <p className="ok">
+                Interview scheduled: {new Date(a.interviewAt).toLocaleString()}
+              </p>
+            )}
           </div>
           <StageBar stage={a.stage} />
         </div>

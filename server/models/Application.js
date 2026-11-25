@@ -15,6 +15,7 @@ const appSchema = new Schema(
 			],
 			default: "applied",
 		},
+		interviewAt: { type: Date, default: undefined },
 		stageHistory: [
     {
         stage: String,

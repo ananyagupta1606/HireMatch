@@ -204,6 +204,86 @@ router.put(
 	}),
 );
 
+// PATCH /api/applications/:id/interview
+// Recruiters can schedule interviews for applicants in the interview stage.
+router.patch(
+	"/:id/interview",
+	protect,
+	allow("recruiter"),
+	wrap(async (req, res) => {
+		const app = await Application.findById(req.params.id).populate(
+			"job",
+			"recruiter title",
+		);
+
+		if (!app || !app.job || !app.job.recruiter.equals(req.user._id)) {
+			return res.status(404).json({
+				message: "Application not found",
+			});
+		}
+
+		if (app.stage !== "interview") {
+			return res.status(400).json({
+				message: "Move this application to the interview stage first.",
+			});
+		}
+
+		if (!req.body || !Object.hasOwn(req.body, "interviewAt")) {
+			return res.status(400).json({
+				message: "Interview date and time are required.",
+			});
+		}
+
+		const previousTime = app.interviewAt
+			? new Date(app.interviewAt).getTime()
+			: null;
+		let nextInterviewAt = null;
+
+		if (req.body.interviewAt !== null && req.body.interviewAt !== "") {
+			if (typeof req.body.interviewAt !== "string") {
+				return res.status(400).json({
+					message: "Interview date and time must be valid.",
+				});
+			}
+
+			nextInterviewAt = new Date(req.body.interviewAt);
+			if (
+				Number.isNaN(nextInterviewAt.getTime()) ||
+				nextInterviewAt.getTime() <= Date.now()
+			) {
+				return res.status(400).json({
+					message: "Choose an interview time in the future.",
+				});
+			}
+		}
+
+		const nextTime = nextInterviewAt?.getTime() ?? null;
+		if (previousTime === nextTime) {
+			return res.json({ interviewAt: app.interviewAt || null });
+		}
+
+		app.interviewAt = nextInterviewAt || undefined;
+		await app.save();
+
+		const action = nextInterviewAt
+			? previousTime
+				? "rescheduled"
+				: "scheduled"
+			: "cancelled";
+		await Notification.create({
+			recipient: app.candidate,
+			type: "interview_scheduled",
+			title: `Interview ${action}`,
+			message: nextInterviewAt
+				? `Your interview for ${app.job.title} was ${action}. View the updated time in My Applications.`
+				: `Your interview for ${app.job.title} was cancelled.`,
+			link: "/applications",
+		});
+
+		res.json({ interviewAt: app.interviewAt || null });
+	}),
+);
+
 // PATCH /api/applications/:id/stage
 // Recruiters can update application stages only for their own jobs.
 router.patch(
@@ -234,6 +314,9 @@ router.patch(
 		}
 
 		app.stage = stage;
+		if (stage !== "interview") {
+			app.interviewAt = undefined;
+		}
 		app.stageHistory.push({ stage });
 
 		await app.save();
