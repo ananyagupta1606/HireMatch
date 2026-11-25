@@ -1,5 +1,6 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../AuthContext.jsx";
+import Notifications from "./Notifications.jsx";
 
 export default function Navbar() {
 	const { user, logout } = useAuth();
@@ -31,15 +32,18 @@ export default function Navbar() {
 
 					{/* Logged-in user */}
 					{user ? (
-						<button
-							className="link"
-							onClick={() => {
-								logout();
-								nav("/");
-							}}
-						>
-							Log out ({user.name.split(" ")[0]})
-						</button>
+						<>
+							<Notifications />
+							<button
+								className="link"
+								onClick={() => {
+									logout();
+									nav("/");
+								}}
+							>
+								Log out ({user.name.split(" ")[0]})
+							</button>
+						</>
 					) : (
 						/* Guest navigation */
 						<>

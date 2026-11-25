@@ -26,6 +26,7 @@ app.use("/api/profile/resume", require("./routes/resumes"));
 app.use("/api/profile", require("./routes/profile"));
 app.use("/api/jobs", require("./routes/jobs"));
 app.use("/api/applications", require("./routes/applications"));
+app.use("/api/notifications", require("./routes/notifications"));
 
 // Handle unknown routes
 app.use((req, res) => {

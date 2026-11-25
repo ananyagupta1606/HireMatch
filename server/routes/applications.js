@@ -1,6 +1,7 @@
 const router = require("express").Router();
 
 const Application = require("../models/Application");
+const Notification = require("../models/Notification");
 const RecruiterNote = require("../models/RecruiterNote");
 const Job = require("../models/Job");
 const Profile = require("../models/CandidateProfile");
@@ -60,6 +61,14 @@ router.post(
 				candidate: req.user._id,
 				coverNote: (coverNote || "").slice(0, 1000),
 				stageHistory: [{ stage: "applied" }],
+			});
+
+			await Notification.create({
+				recipient: job.recruiter,
+				type: "application_received",
+				title: "New job application",
+				message: `${req.user.name} applied for ${job.title}.`,
+				link: `/dashboard/jobs/${job._id}`,
 			});
 
 			return res.status(201).json(app);
@@ -204,7 +213,7 @@ router.patch(
 	wrap(async (req, res) => {
 		const app = await Application.findById(req.params.id).populate(
 			"job",
-			"recruiter",
+			"recruiter title",
 		);
 
 		if (!app || !app.job || !app.job.recruiter.equals(req.user._id)) {
@@ -228,6 +237,17 @@ router.patch(
 		app.stageHistory.push({ stage });
 
 		await app.save();
+
+		const interviewSet = stage === "interview";
+		await Notification.create({
+			recipient: app.candidate,
+			type: interviewSet ? "interview_set" : "application_status",
+			title: interviewSet ? "Interview stage set" : "Application status updated",
+			message: interviewSet
+				? `Your application for ${app.job.title} has moved to the interview stage.`
+				: `Your application for ${app.job.title} has moved to ${stage}.`,
+			link: "/applications",
+		});
 
 		res.json({
 			_id: app._id,

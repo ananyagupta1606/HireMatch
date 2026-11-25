@@ -142,6 +142,114 @@ hr {
 	font-weight: 650;
 }
 
+.notification-area {
+	position: relative;
+}
+
+.notification-toggle {
+	position: relative;
+	display: grid;
+	width: 38px;
+	height: 38px;
+	place-items: center;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	background: transparent;
+	color: #c9d6d2;
+	cursor: pointer;
+	transition: background 0.2s, color 0.2s;
+}
+
+.notification-toggle:hover {
+	background: rgba(255, 255, 255, 0.1);
+	color: #fff;
+}
+
+.notification-bell {
+	width: 21px;
+	height: 21px;
+}
+
+.notification-count {
+	position: absolute;
+	top: 0;
+	right: -2px;
+	display: grid;
+	min-width: 18px;
+	height: 18px;
+	place-items: center;
+	padding: 0 4px;
+	border-radius: 999px;
+	background: var(--bad);
+	color: #fff;
+	font-size: 0.68rem;
+	font-weight: 700;
+	line-height: 1;
+}
+
+.notification-panel {
+	position: absolute;
+	z-index: 5;
+	top: calc(100% + 0.7rem);
+	right: 0;
+	width: min(360px, calc(100vw - 2rem));
+	max-height: 420px;
+	overflow-y: auto;
+	padding: 0.8rem;
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	background: var(--card);
+	box-shadow: 0 12px 32px rgba(18, 32, 43, 0.18);
+	color: var(--ink);
+}
+
+.notification-heading {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.8rem;
+	padding: 0.2rem 0.2rem 0.65rem;
+	border-bottom: 1px solid var(--line);
+}
+
+.notification-heading .link {
+	color: var(--brand);
+	font-size: 0.8rem;
+}
+
+.notification-list {
+	display: grid;
+}
+
+.nav a.notification-item {
+	display: grid;
+	gap: 0.2rem;
+	padding: 0.7rem 0.45rem;
+	border-bottom: 1px solid var(--line);
+	color: var(--ink);
+	text-decoration: none;
+}
+
+.nav a.notification-item:last-child {
+	border-bottom: 0;
+}
+
+.nav a.notification-item:hover,
+.nav a.notification-item.unread {
+	background: #f0f8f5;
+}
+
+.nav a.notification-item span,
+.nav a.notification-item small {
+	color: var(--muted);
+	font-size: 0.82rem;
+}
+
+.notification-empty {
+	padding: 0.7rem 0.2rem 0.2rem;
+}
+
 /* =========================
    CARDS AND FORMS
 ========================= */
@@ -1132,6 +1240,11 @@ textarea:disabled {
 
 	.nav nav {
 		justify-content: flex-start;
+	}
+
+	.notification-panel {
+		right: auto;
+		left: 0;
 	}
 }
 
