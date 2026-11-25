@@ -10,7 +10,12 @@ const notificationSchema = new Schema(
 		},
 		type: {
 			type: String,
-			enum: ["application_received", "application_status", "interview_set"],
+			enum: [
+				"job_match",
+				"application_received",
+				"application_status",
+				"interview_set",
+			],
 			required: true,
 		},
 		title: { type: String, required: true },

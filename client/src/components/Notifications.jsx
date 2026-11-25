@@ -76,18 +76,20 @@ export default function Notifications() {
 		<section
 			className="notification-area"
 			aria-label="Notifications"
-			onMouseEnter={() => setOpen(true)}
 			onMouseLeave={() => setOpen(false)}
-			onFocus={() => setOpen(true)}
 			onBlur={(event) => {
 				if (!event.currentTarget.contains(event.relatedTarget)) {
 					setOpen(false);
 				}
 			}}
+			onKeyDown={(event) => {
+				if (event.key === "Escape") setOpen(false);
+			}}
 		>
 			<button
 				type="button"
 				className="notification-toggle"
+				onClick={() => setOpen((current) => !current)}
 				aria-expanded={open}
 				aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ""}`}
 			>

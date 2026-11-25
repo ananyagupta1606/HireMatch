@@ -11,6 +11,7 @@ HireMatch is a MERN-based job portal connecting candidates and recruiters. Its k
 - **Skill Match Ring:** View match scores and skill gaps.
 - **Job Management:** Recruiters can post and close jobs, with ownership checks.
 - **Applications:** Apply for jobs, prevent duplicate applications, and track application status.
+- **In-app notifications:** Get bell alerts for jobs matching your profile skills, new applications, and application-stage updates. No email notifications are sent.
 - **Recruiter Dashboard:** View and rank applicants by skill-match score.
 - **Stage Management:** Server-side validation of application stage transitions.
 
@@ -90,6 +91,9 @@ Run the seed script before using these accounts.
 | POST | `/api/applications` | Candidate |
 | GET | `/api/applications/me` | Candidate |
 | PATCH | `/api/applications/:id/stage` | Job owner |
+| GET | `/api/notifications` | Authenticated user |
+| PATCH | `/api/notifications/:id/read` | Notification owner |
+| PATCH | `/api/notifications/read-all` | Authenticated user |
 
 Job search supports `role`, `location`, `workMode`, `minExp`, `ctc`, `skills`, and `page`.
 

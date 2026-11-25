@@ -1,6 +1,7 @@
 const router = require("express").Router();
 const Job = require("../models/Job");
 const Application = require("../models/Application");
+const Notification = require("../models/Notification");
 const RecruiterNote = require("../models/RecruiterNote");
 const Profile = require("../models/CandidateProfile");
 const wrap = require("../utils/wrap");
@@ -201,6 +202,26 @@ router.post(
 			ctcMin: Number(ctcMin) || 0,
 			ctcMax: Number(ctcMax) || 0,
 		});
+
+		if (job.skills.length > 0) {
+			const matchingProfiles = await Profile.find({
+				skills: { $in: job.skills },
+			})
+				.select("userId")
+				.lean();
+
+			if (matchingProfiles.length > 0) {
+				await Notification.insertMany(
+					matchingProfiles.map((profile) => ({
+						recipient: profile.userId,
+						type: "job_match",
+						title: "A new job matches your skills",
+						message: `${job.title} at ${job.company} matches skills on your profile.`,
+						link: `/jobs/${job._id}`,
+					})),
+				);
+			}
+		}
 
 		res.status(201).json(job);
 	}),
