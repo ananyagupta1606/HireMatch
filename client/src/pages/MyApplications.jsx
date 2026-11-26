@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api, { errMsg } from '../api.js';
 import StageBar from '../components/StageBar.jsx';
+import { formatLabel } from '../format.js';
+import DateTimePicker from '../components/DateTimePicker.jsx';
 
 const getStageHistory = (application) => {
   const history = Array.isArray(application.stageHistory)
@@ -24,6 +26,42 @@ const formatStage = (stage) => stage.charAt(0).toUpperCase() + stage.slice(1);
 const getInterviewMode = (details = {}) => (
   details.mode || (details.meetingLink ? 'online' : details.location ? 'offline' : 'online')
 );
+
+const getNextStep = (application) => {
+  switch (application.stage) {
+    case 'applied':
+      return 'Next: Wait for recruiter review';
+    case 'shortlisted':
+      return 'Next: Watch for interview details';
+    case 'interview':
+      return application.interviewAt
+        ? 'Next: Prepare for your interview'
+        : 'Next: Wait for interview scheduling';
+    case 'offered':
+      return 'Next: Review your offer';
+    case 'rejected':
+      return 'This application is closed';
+    case 'withdrawn':
+      return application.job.status === 'open'
+        ? 'You can reapply while this role is open'
+        : 'This application was withdrawn';
+    default:
+      return 'Check your application status';
+  }
+};
+
+const getAppliedAt = (application) => {
+  const appliedAt = getStageHistory(application)
+    .filter((entry) => entry.stage === 'applied')
+    .reduce((latest, entry) => (
+      !latest || new Date(entry.at) > new Date(latest) ? entry.at : latest
+    ), null)
+    || application.createdAt;
+
+  return appliedAt && !Number.isNaN(new Date(appliedAt).getTime())
+    ? appliedAt
+    : null;
+};
 
 const applicationFilters = [
   { stage: 'all', label: 'All' },
@@ -149,18 +187,18 @@ export default function MyApplications() {
     }
   };
 
-  const overview = apps?.reduce((counts, application) => {
-    counts.total += 1;
-    if (['applied', 'shortlisted', 'interview'].includes(application.stage)) {
-      counts.active += 1;
-    }
-    if (application.stage === 'interview') counts.interviews += 1;
-    if (application.stage === 'offered') counts.offers += 1;
-    return counts;
-  }, { total: 0, active: 0, interviews: 0, offers: 0 });
   const visibleApps = selectedStage === 'all'
     ? apps
     : apps?.filter((application) => application.stage === selectedStage);
+  const upcomingInterview = visibleApps
+    ?.filter((application) => (
+      application.stage === 'interview' &&
+      application.interviewAt &&
+      new Date(application.interviewAt) > new Date()
+    ))
+    .sort((first, second) => (
+      new Date(first.interviewAt) - new Date(second.interviewAt)
+    ))[0];
 
   const withdraw = async (application) => {
     setWithdrawingId(application._id);
@@ -227,38 +265,53 @@ export default function MyApplications() {
         <div className="candidate-dashboard-heading">
           <div>
             <span className="candidate-dashboard-eyebrow">YOUR JOB SEARCH</span>
-            <h1 id="applications-title">My applications</h1>
+            <h1 id="applications-title">My Applications</h1>
             <p>Keep track of every opportunity and what comes next.</p>
           </div>
           <Link className="candidate-browse-action" to="/">
-            Explore jobs <span aria-hidden="true">→</span>
+            Explore Jobs <span aria-hidden="true">→</span>
           </Link>
         </div>
-
-        <div className="candidate-dashboard-stats" role="group" aria-label="Application overview">
-          {[
-            ['Applications', overview?.total],
-            ['In progress', overview?.active],
-            ['Interviews', overview?.interviews],
-            ['Offers', overview?.offers],
-          ].map(([label, value]) => (
-            <div className="candidate-stat-card" key={label}>
-              <span>{label}</span>
-              <strong>{apps ? value : '—'}</strong>
-            </div>
-          ))}
-        </div>
       </section>
+
+      {upcomingInterview && (
+        <section className="candidate-upcoming-interview" aria-labelledby="upcoming-interview-title">
+          <div className="candidate-upcoming-interview-copy">
+            <span className="candidate-dashboard-eyebrow">UP NEXT</span>
+            <h2 id="upcoming-interview-title">{upcomingInterview.job.title}</h2>
+            <p>
+              {upcomingInterview.job.company}
+              <span aria-hidden="true"> · </span>
+              <time dateTime={new Date(upcomingInterview.interviewAt).toISOString()}>
+                {new Intl.DateTimeFormat(undefined, {
+                  dateStyle: 'full',
+                  timeStyle: 'short',
+                }).format(new Date(upcomingInterview.interviewAt))}
+              </time>
+              <span aria-hidden="true"> · </span>
+              {upcomingInterview.interviewDurationMinutes || 60} minutes
+            </p>
+          </div>
+          <div className="candidate-upcoming-interview-actions">
+            <button
+              type="button"
+              className="btn"
+              onClick={() => downloadInterviewCalendar(upcomingInterview)}
+            >
+              Add to Calendar
+            </button>
+            <a href={`#application-${upcomingInterview._id}`}>
+              View application <span aria-hidden="true">→</span>
+            </a>
+          </div>
+        </section>
+      )}
 
       <section className="candidate-applications" aria-labelledby="application-list-title">
         <div className="candidate-list-heading">
           <div>
-            <h2 id="application-list-title">Application activity</h2>
-            <p>
-              {apps
-                ? `${visibleApps.length} ${visibleApps.length === 1 ? 'opportunity' : 'opportunities'}${selectedStage === 'all' ? ' in your pipeline' : ` with status ${formatStage(selectedStage)}`}`
-                : 'Your applications will appear here.'}
-            </p>
+            <h2 id="application-list-title">Your Applications</h2>
+            <p>Filter by status to see where each opportunity stands.</p>
           </div>
         </div>
 
@@ -307,7 +360,7 @@ export default function MyApplications() {
           </div>
         ) : visibleApps.length === 0 ? (
           <div className="candidate-state-card candidate-state-card--empty">
-            <strong>No {formatStage(selectedStage).toLowerCase()} applications yet</strong>
+            <strong>No {formatLabel(selectedStage)} Applications Yet</strong>
             <p>Applications with this status will appear here.</p>
             <button type="button" className="btn ghost" onClick={() => setSelectedStage('all')}>
               Show all applications
@@ -315,14 +368,21 @@ export default function MyApplications() {
           </div>
         ) : (
           <div className="candidate-application-list">
-            {visibleApps.map((application) => (
-              <article className="candidate-application-card" key={application._id}>
+            {visibleApps.map((application) => {
+              const appliedAt = getAppliedAt(application);
+              return (
+                <article
+                  className="candidate-application-card"
+                  id={`application-${application._id}`}
+                  key={application._id}
+                >
                 <div className="candidate-application-main">
                   <div className="candidate-application-heading">
                     <div>
                       <Link
                         className="candidate-job-title"
                         to={`/jobs/${application.job._id}`}
+                        state={{ from: "applications" }}
                       >
                         {application.job.title}
                       </Link>
@@ -331,20 +391,32 @@ export default function MyApplications() {
                         <span aria-hidden="true"> · </span>
                         {application.job.location}
                       </p>
+                      {appliedAt && (
+                        <p className="candidate-application-applied-date">
+                          Applied{' '}
+                          <time dateTime={new Date(appliedAt).toISOString()}>
+                            {new Date(appliedAt).toLocaleDateString(undefined, {
+                              dateStyle: 'medium',
+                            })}
+                          </time>
+                        </p>
+                      )}
                     </div>
                   </div>
 
-                  {application.stage === 'interview' && !application.interviewAt && (
-                    <p className="candidate-interview-notice">
-                      Interview stage reached. The recruiter has not scheduled a time yet.
-                    </p>
-                  )}
+                  <p className={`candidate-next-step candidate-next-step--${application.stage}`}>
+                    {getNextStep(application)}
+                  </p>
 
                   {application.interviewAt && (
                     <section className="candidate-interview-card" aria-label="Interview details">
                       <div className="candidate-interview-heading">
                         <div>
-                          <span className="candidate-dashboard-eyebrow">UPCOMING INTERVIEW</span>
+                          <span className="candidate-dashboard-eyebrow">
+                            {new Date(application.interviewAt) > new Date()
+                              ? 'UPCOMING INTERVIEW'
+                              : 'INTERVIEW DETAILS'}
+                          </span>
                           <h3>
                             <time dateTime={new Date(application.interviewAt).toISOString()}>
                               {new Date(application.interviewAt).toLocaleString()}
@@ -354,13 +426,15 @@ export default function MyApplications() {
                             Duration: {application.interviewDurationMinutes || 60} minutes
                           </p>
                         </div>
-                        <button
-                          type="button"
-                          className="btn ghost small"
-                          onClick={() => downloadInterviewCalendar(application)}
-                        >
-                          Add to calendar
-                        </button>
+                        {upcomingInterview?._id !== application._id && (
+                          <button
+                            type="button"
+                            className="btn ghost small"
+                            onClick={() => downloadInterviewCalendar(application)}
+                          >
+                            Add to Calendar
+                          </button>
+                        )}
                       </div>
                       {application.interviewDetails && (
                         <div className="candidate-interview-logistics">
@@ -426,8 +500,8 @@ export default function MyApplications() {
                             }}
                           >
                             {application.interviewConcern?.status === 'pending'
-                              ? 'Update conflict request'
-                              : 'Report a scheduling conflict'}
+                              ? 'Update Conflict Request'
+                              : 'Report a Scheduling Conflict'}
                           </button>
                           {concernFormForId === application._id && (
                             <form
@@ -451,14 +525,13 @@ export default function MyApplications() {
                               </label>
                               <label htmlFor={`conflict-time-${application._id}`}>
                                 Preferred alternative time (optional)
-                                <input
-                                  id={`conflict-time-${application._id}`}
-                                  type="datetime-local"
-                                  min={toLocalDateTime(Date.now() + 60_000)}
-                                  value={concernPreferredAt}
-                                  onChange={(event) => setConcernPreferredAt(event.target.value)}
-                                />
                               </label>
+                              <DateTimePicker
+                                id={`conflict-time-${application._id}`}
+                                value={concernPreferredAt}
+                                minValue={toLocalDateTime(Date.now() + 60_000)}
+                                onChange={setConcernPreferredAt}
+                              />
                               {actionError && <p className="error" role="alert">{actionError}</p>}
                               <div className="actions">
                                 <button
@@ -493,7 +566,7 @@ export default function MyApplications() {
                   </div>
 
                   <details className="candidate-stage-history">
-                    <summary>View status history</summary>
+                    <summary>View Status History</summary>
                     <ol aria-label="Application status history">
                       {getStageHistory(application).map((entry, index) => (
                         <li key={`${entry.stage}-${entry.at}-${index}`}>
@@ -511,11 +584,12 @@ export default function MyApplications() {
                   <Link
                     className="candidate-view-job"
                     to={`/jobs/${application.job._id}`}
+                    state={{ from: "applications" }}
                     aria-label={`${application.stage === 'withdrawn' && application.job.status === 'open' ? 'Reapply to' : 'View'} ${application.job.title}`}
                   >
                     {application.stage === 'withdrawn' && application.job.status === 'open'
                       ? 'Reapply'
-                      : 'View job'} <span aria-hidden="true">→</span>
+                      : 'View Job'} <span aria-hidden="true">→</span>
                   </Link>
                   {['applied', 'shortlisted', 'interview'].includes(application.stage) && (
                     <button
@@ -531,8 +605,9 @@ export default function MyApplications() {
                     </button>
                   )}
                 </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
         )}
       </section>

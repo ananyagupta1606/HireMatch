@@ -77,7 +77,7 @@ export default function Jobs() {
 			<section className="jobs-hero">
 				<div className="jobs-hero-copy">
 					<span className="jobs-eyebrow">YOUR NEXT CHAPTER</span>
-					<h1>Find a role that fits you.</h1>
+					<h1>Find a Role That Fits You.</h1>
 					<p>
 						Explore opportunities that match your skills, goals, and
 						the way you want to work.
@@ -118,7 +118,7 @@ export default function Jobs() {
 				<div className="jobs-filter-heading">
 					<div>
 						<span className="jobs-section-kicker">OPPORTUNITIES</span>
-						<h2>Find your next role</h2>
+						<h2>Find Your Next Role</h2>
 					</div>
 					{activeFilterCount > 0 && (
 						<span className="jobs-active-filters">
@@ -189,10 +189,10 @@ export default function Jobs() {
 				</div>
 				<div className="jobs-filter-actions">
 					<button type="submit" className="btn">
-						Search jobs <span aria-hidden="true">→</span>
+						Search Jobs <span aria-hidden="true">→</span>
 					</button>
 					<button type="button" className="jobs-clear-button" onClick={reset}>
-						Clear filters
+						Clear Filters
 					</button>
 				</div>
 			</form>
@@ -201,7 +201,7 @@ export default function Jobs() {
 				<div className="jobs-results-heading">
 					<div>
 						<span className="jobs-section-kicker">CURATED FOR YOU</span>
-						<h2>{loading ? "Browse open roles" : "Open roles"}</h2>
+						<h2>{loading ? "Browse Open Roles" : "Open Roles"}</h2>
 					</div>
 					{!loading && !error && (
 						<span className="jobs-result-count">

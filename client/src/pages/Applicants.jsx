@@ -4,6 +4,7 @@ import api, { errMsg } from '../api.js';
 import MatchRing from '../components/MatchRing.jsx';
 import StageBar from '../components/StageBar.jsx';
 import DateTimePicker from '../components/DateTimePicker.jsx';
+import { formatLabel } from '../format.js';
 
 const STAGES = ['applied', 'shortlisted', 'interview', 'offered', 'rejected', 'withdrawn'];
 
@@ -129,7 +130,7 @@ export default function Applicants() {
     setMessage('');
     try {
       await api.patch(`/applications/${applicant._id}/stage`, { stage });
-      setMessage(`Application moved to ${stage}.`);
+      setMessage(`Application moved to ${formatLabel(stage)}.`);
       await load();
     } catch (e) {
       setError(errMsg(e));
@@ -645,7 +646,7 @@ export default function Applicants() {
                   ? 'Updating...'
                   : stage === 'rejected'
                     ? 'Reject'
-                    : `Move to ${stage}`}
+                    : `Move to ${formatLabel(stage)}`}
               </button>
             ))}
           </div>

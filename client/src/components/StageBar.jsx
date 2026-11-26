@@ -1,3 +1,5 @@
+import { formatLabel } from "../format.js";
+
 const STEPS = ['applied', 'shortlisted', 'interview', 'offered'];
 
 export default function StageBar({ stage }) {
@@ -6,7 +8,7 @@ export default function StageBar({ stage }) {
   const at = STEPS.indexOf(stage);
   return (
     <div className="steps">
-      {STEPS.map((s, i) => <span key={s} className={`step step--${s} ${i < at ? 'done' : i === at ? 'now' : ''}`}>{s}</span>)}
+      {STEPS.map((s, i) => <span key={s} className={`step step--${s} ${i < at ? 'done' : i === at ? 'now' : ''}`}>{formatLabel(s)}</span>)}
     </div>
   );
 }

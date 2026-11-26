@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api, { errMsg } from '../api.js';
+import { formatLabel } from '../format.js';
 
 const EMPTY = { title: '', description: '', skills: '', location: '', workMode: 'onsite', minExp: 0, ctcMin: 0, ctcMax: 0 };
 const APPLICANT_STAGES = [
@@ -38,6 +39,7 @@ export default function Dashboard() {
   const [applicationsReload, setApplicationsReload] = useState(0);
   const [f, setF] = useState(EMPTY);
   const [skillDraft, setSkillDraft] = useState('');
+  const [ctcError, setCtcError] = useState('');
   const [msg, setMsg] = useState({ type: '', text: '' });
   const [editingJobId, setEditingJobId] = useState(null);
   const [jobToDelete, setJobToDelete] = useState(null);
@@ -49,7 +51,10 @@ export default function Dashboard() {
   const [applicationView, setApplicationView] = useState('all');
   const [applicationSearch, setApplicationSearch] = useState('');
   const applicationRequestId = useRef(0);
-  const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const set = (k) => (e) => {
+    setF((prev) => ({ ...prev, [k]: e.target.value }));
+    if (k === 'ctcMin' || k === 'ctcMax') setCtcError('');
+  };
   const skills = parseSkills(f.skills);
   const summary = jobs.reduce((totals, job) => ({
     openRoles: totals.openRoles + (job.status === 'open' ? 1 : 0),
@@ -62,8 +67,8 @@ export default function Dashboard() {
   ));
   const hasActiveFilters = Boolean(normalizedQuery || statusFilter !== 'all' || workModeFilter !== 'all');
   const applicationViews = [
-    { id: 'all', label: 'All applicants', count: applicationCounts.all || 0 },
-    { id: 'scheduled', label: 'Scheduled interviews', count: applicationCounts.scheduled || 0 },
+    { id: 'all', label: 'All Applicants', count: applicationCounts.all || 0 },
+    { id: 'scheduled', label: 'Scheduled Interviews', count: applicationCounts.scheduled || 0 },
     ...APPLICANT_STAGES.map(([stage, label]) => ({
       id: stage,
       label,
@@ -163,6 +168,11 @@ export default function Dashboard() {
 
   const saveJob = async (e) => {
     e.preventDefault();
+    if (Number(f.ctcMin) > Number(f.ctcMax)) {
+      setCtcError('Minimum CTC cannot exceed maximum CTC.');
+      return;
+    }
+    setCtcError('');
     setSavingJob(true);
     setMsg({ type: '', text: '' });
     try {
@@ -174,6 +184,7 @@ export default function Dashboard() {
         setMsg({ type: 'ok', text: 'Job posted.' });
       }
       setF(EMPTY);
+      setCtcError('');
       setSkillDraft('');
       setEditingJobId(null);
       await load();
@@ -186,6 +197,7 @@ export default function Dashboard() {
 
   const edit = (job) => {
     setEditingJobId(job._id);
+    setCtcError('');
     setF({
       title: job.title,
       description: job.description,
@@ -203,6 +215,7 @@ export default function Dashboard() {
 
   const cancelEdit = () => {
     setEditingJobId(null);
+    setCtcError('');
     setF(EMPTY);
     setSkillDraft('');
     setMsg({ type: '', text: '' });
@@ -249,14 +262,14 @@ export default function Dashboard() {
         <div className="recruiter-dashboard-heading">
           <div>
             <span className="recruiter-form-eyebrow">RECRUITER WORKSPACE</span>
-            <h1>Your hiring dashboard</h1>
+            <h1>Your Hiring Dashboard</h1>
             <p>Manage your openings and keep track of candidates.</p>
           </div>
           <div className="recruiter-dashboard-actions">
             <a className="recruiter-open-role-count" href="#job-openings">
               {loadingJobs && jobs.length === 0 ? '—' : summary.openRoles} Open Roles
             </a>
-            <a className="recruiter-primary-action" href="#job-form">+ Post a job</a>
+            <a className="recruiter-primary-action" href="#job-form">+ Post a Job</a>
           </div>
         </div>
         {msg.text && !jobToDelete && <p className={msg.type} role={msg.type === 'error' ? 'alert' : 'status'}>{msg.text}</p>}
@@ -287,7 +300,7 @@ export default function Dashboard() {
         </div>
         <div className="recruiter-application-search">
           <label className="recruiter-application-search-field">
-            <span className="sr-only">Search candidates or roles</span>
+            <span className="sr-only">            Search Candidates or Roles</span>
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="m21 21-4.35-4.35m1.35-5.15a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Z" />
             </svg>
@@ -364,7 +377,7 @@ export default function Dashboard() {
                   </p>
                   <div className="recruiter-application-meta">
                     <span className={`recruiter-application-stage recruiter-application-stage--${application.stage}`}>
-                      {application.stage}
+                      {formatLabel(application.stage)}
                     </span>
                     {application.stage === 'interview' && application.interviewAt && (
                       <span>
@@ -431,7 +444,7 @@ export default function Dashboard() {
         <section className="recruiter-job-list-section" id="job-openings">
           <div className="recruiter-list-heading">
             <div>
-              <h2>Job openings</h2>
+              <h1>Job Openings</h1>
               <p>
                 {hasActiveFilters
                   ? `Showing ${visibleJobs.length} of ${jobs.length} posting${jobs.length === 1 ? '' : 's'}`
@@ -440,19 +453,19 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="recruiter-job-filters">
-            <label>Search roles
+            <label>Search Roles
               <input type="search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search title or location" />
             </label>
             <label>Status
               <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                <option value="all">All statuses</option>
+                <option value="all">All Statuses</option>
                 <option value="open">Open</option>
                 <option value="closed">Closed</option>
               </select>
             </label>
-            <label>Work mode
+            <label>Work Mode
               <select value={workModeFilter} onChange={(e) => setWorkModeFilter(e.target.value)}>
-                <option value="all">All work modes</option>
+                <option value="all">All Work Modes</option>
                 <option value="onsite">Onsite</option>
                 <option value="hybrid">Hybrid</option>
                 <option value="remote">Remote</option>
@@ -508,7 +521,7 @@ export default function Dashboard() {
                 <div className="recruiter-job-details">
                   <div className="recruiter-job-heading">
                     <strong>{j.title}</strong>
-                    <span className={`recruiter-job-status recruiter-job-status--${j.status === 'open' ? 'open' : 'closed'}`}>{j.status}</span>
+                    <span className={`recruiter-job-status recruiter-job-status--${j.status === 'open' ? 'open' : 'closed'}`}>{formatLabel(j.status)}</span>
                   </div>
                   <p className="recruiter-job-meta">{j.location} · {j.workMode}</p>
                   <p className="recruiter-job-compensation">
@@ -527,7 +540,7 @@ export default function Dashboard() {
                     aria-label={`View ${j.applicants} applicant${j.applicants === 1 ? '' : 's'} for ${j.title}`}
                   >
                     <strong>{j.applicants ?? 0}</strong>
-                    <span>View applicants <span aria-hidden="true">→</span></span>
+                    <span>View Applicants <span aria-hidden="true">→</span></span>
                   </Link>
                   <div className="recruiter-action-group" aria-label={`Manage ${j.title}`}>
                     <button className="recruiter-action recruiter-action--edit" disabled={busyJobId === j._id} onClick={() => edit(j)}>Edit</button>
@@ -555,73 +568,91 @@ export default function Dashboard() {
 
         <form id="job-form" className="card recruiter-job-form" onSubmit={saveJob}>
           <div className="recruiter-form-heading">
+            <span className="recruiter-form-heading-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <rect x="3" y="7" width="18" height="14" rx="2" />
+                <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12h18m-12 0v2h6v-2" />
+              </svg>
+            </span>
             <div>
               <span className="recruiter-form-eyebrow">{editingJobId ? 'JOB DETAILS' : 'HIRING'}</span>
-              <h2>{editingJobId ? 'Edit job opening' : 'Post a job opening'}</h2>
+              <h2>{editingJobId ? 'Edit Job Opening' : 'Post a Job Opening'}</h2>
               <p>{editingJobId ? 'Update the details candidates see.' : 'Share the role details to find your next great hire.'}</p>
             </div>
-            {/* <span className="recruiter-form-mark" aria-hidden="true">+</span> */}
           </div>
           <div className="recruiter-form-fields">
-            <label className="recruiter-form-field">Job title
-              <input value={f.title} onChange={set('title')} placeholder="e.g. Senior Product Designer" required />
-            </label>
-            <label className="recruiter-form-field">Description
-              <textarea rows="4" value={f.description} onChange={set('description')} placeholder="What will this person work on?" required />
-            </label>
-            <div className="recruiter-form-field">
-              <label htmlFor="job-skills">Skills</label>
-              <div className="recruiter-skill-entry">
-                <input
-                  id="job-skills"
-                  value={skillDraft}
-                  onChange={(e) => setSkillDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && skillDraft.trim()) {
-                      e.preventDefault();
-                      addSkills(skillDraft);
-                    }
-                  }}
-                  placeholder="Add a skill, e.g. React"
-                  aria-describedby="job-skills-hint"
-                />
-                <button type="button" className="recruiter-skill-add" onClick={() => addSkills(skillDraft)}>Add</button>
-              </div>
-              <p className="recruiter-form-hint" id="job-skills-hint">Press Enter or add several skills separated by commas.</p>
-              {skills.length > 0 && (
-                <div className="recruiter-job-skill-list" role="list" aria-label="Added skills">
-                  {skills.map((skill) => (
-                    <span className="selected-skill" role="listitem" key={skill.toLowerCase()}>
-                      {skill}
-                      <button type="button" onClick={() => removeSkill(skill)} aria-label={`Remove ${skill}`}>×</button>
-                    </span>
-                  ))}
+            <section className="recruiter-form-section" aria-labelledby="job-role-details">
+              <h3 className="recruiter-form-section-title" id="job-role-details">Role Details</h3>
+              <label className="recruiter-form-field">Job Title
+                <input value={f.title} onChange={set('title')} placeholder="e.g. Senior Product Designer" required />
+              </label>
+              <label className="recruiter-form-field">Description
+                <textarea rows="4" value={f.description} onChange={set('description')} placeholder="What will this person work on?" required />
+              </label>
+              <div className="recruiter-form-field">
+                <label htmlFor="job-skills">Skills</label>
+                <div className="recruiter-skill-entry">
+                  <input
+                    id="job-skills"
+                    value={skillDraft}
+                    onChange={(e) => setSkillDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && skillDraft.trim()) {
+                        e.preventDefault();
+                        addSkills(skillDraft);
+                      }
+                    }}
+                    placeholder="Add a skill, e.g. React"
+                    aria-describedby="job-skills-hint"
+                  />
+                  <button type="button" className="recruiter-skill-add" onClick={() => addSkills(skillDraft)}>Add</button>
                 </div>
-              )}
-            </div>
-            <div className="recruiter-form-row">
-              <label className="recruiter-form-field">Location
-                <input value={f.location} onChange={set('location')} placeholder="e.g. Bengaluru" required />
-              </label>
-              <label className="recruiter-form-field">Work mode
-                <select value={f.workMode} onChange={set('workMode')}><option value="onsite">Onsite</option><option value="hybrid">Hybrid</option><option value="remote">Remote</option></select>
-              </label>
-            </div>
-            <div className="recruiter-form-row recruiter-form-row--numbers">
-              <label className="recruiter-form-field">Min. experience
-                <div className="recruiter-number-field"><input type="number" min="0" value={f.minExp} onChange={set('minExp')} /><span>years</span></div>
-              </label>
-              <label className="recruiter-form-field">CTC min
-                <div className="recruiter-number-field"><input type="number" min="0" value={f.ctcMin} onChange={set('ctcMin')} /><span>LPA</span></div>
-              </label>
-              <label className="recruiter-form-field">CTC max
-                <div className="recruiter-number-field"><input type="number" min="0" value={f.ctcMax} onChange={set('ctcMax')} /><span>LPA</span></div>
-              </label>
-            </div>
+                <p className="recruiter-form-hint" id="job-skills-hint">Press Enter or add several skills separated by commas.</p>
+                {skills.length > 0 && (
+                  <div className="recruiter-job-skill-list" role="list" aria-label="Added skills">
+                    {skills.map((skill) => (
+                      <span className="selected-skill" role="listitem" key={skill.toLowerCase()}>
+                        {skill}
+                        <button type="button" onClick={() => removeSkill(skill)} aria-label={`Remove ${skill}`}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </section>
+            <section className="recruiter-form-section" aria-labelledby="job-location-details">
+              <h3 className="recruiter-form-section-title" id="job-location-details">Location &amp; Work Mode</h3>
+              <div className="recruiter-form-row">
+                <label className="recruiter-form-field">Location
+                  <input value={f.location} onChange={set('location')} placeholder="e.g. Bengaluru" required />
+                </label>
+                <label className="recruiter-form-field">Work Mode
+                  <select value={f.workMode} onChange={set('workMode')}><option value="onsite">Onsite</option><option value="hybrid">Hybrid</option><option value="remote">Remote</option></select>
+                </label>
+              </div>
+            </section>
+            <section className="recruiter-form-section" aria-labelledby="job-experience-details">
+              <h3 className="recruiter-form-section-title" id="job-experience-details">Experience &amp; Compensation</h3>
+              <div className="recruiter-form-row recruiter-form-row--numbers">
+                <label className="recruiter-form-field">Minimum Experience
+                  <div className="recruiter-number-field"><input type="number" min="0" value={f.minExp} onChange={set('minExp')} /><span>years</span></div>
+                </label>
+                <label className="recruiter-form-field">Minimum CTC
+                  <div className="recruiter-number-field"><input type="number" min="0" value={f.ctcMin} onChange={set('ctcMin')} /><span>LPA</span></div>
+                </label>
+                <label className="recruiter-form-field">Maximum CTC
+                  <div className="recruiter-number-field"><input type="number" min="0" value={f.ctcMax} onChange={set('ctcMax')} /><span>LPA</span></div>
+                </label>
+              </div>
+              {ctcError && <p className="error" role="alert">{ctcError}</p>}
+            </section>
           </div>
           <div className="recruiter-form-footer">
-            <button className="btn recruiter-form-submit" disabled={savingJob}>{savingJob ? 'Saving...' : editingJobId ? 'Save changes' : 'Post job opening'}</button>
-            {editingJobId && <button type="button" className="btn ghost" onClick={cancelEdit} disabled={savingJob}>Cancel edit</button>}
+            <button className="btn recruiter-form-submit" disabled={savingJob}>
+              <span>{savingJob ? 'Saving...' : editingJobId ? 'Save Changes' : 'Post Job Opening'}</span>
+              <span className="recruiter-form-submit-icon" aria-hidden="true">→</span>
+            </button>
+            {editingJobId && <button type="button" className="btn ghost" onClick={cancelEdit} disabled={savingJob}>Cancel Edit</button>}
           </div>
         </form>
       </div>

@@ -184,7 +184,9 @@ export default function Account() {
 	};
 
 	return (
-		<main className="profile-page account-page">
+		<main
+			className={`profile-page account-page${isRecruiter ? " account-page--recruiter" : " account-page--candidate"}`}
+		>
 			<header className="profile-heading">
 				<div>
 					<span className="profile-eyebrow">ACCOUNT SETTINGS</span>

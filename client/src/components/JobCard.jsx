@@ -1,9 +1,14 @@
 import { Link } from "react-router-dom";
 import MatchRing from "./MatchRing.jsx";
+import { formatLabel } from "../format.js";
 
 export default function JobCard({ job }) {
 	return (
-		<Link to={`/jobs/${job._id}`} className="card job jobs-job-card">
+		<Link
+			to={`/jobs/${job._id}`}
+			state={{ from: "jobs" }}
+			className="card job jobs-job-card"
+		>
 			<div className="jobs-card-heading">
 				<div className="jobs-card-title">
 					<h3>{job.title}</h3>
@@ -17,8 +22,8 @@ export default function JobCard({ job }) {
 				)}
 			</div>
 			<div className="jobs-card-tags">
-				<span>{job.location}</span>
-				<span>{job.workMode}</span>
+				<span>{formatLabel(job.location)}</span>
+				<span>{formatLabel(job.workMode)}</span>
 			</div>
 			<div className="jobs-card-details">
 				<span>
@@ -35,7 +40,7 @@ export default function JobCard({ job }) {
 							key={skill}
 							className={`chip ${job.match ? (job.match.missing.includes(skill) ? "miss" : "hit") : ""}`}
 						>
-							{skill}
+							{formatLabel(skill)}
 						</span>
 					))}
 					{job.skills.length > 4 && (
@@ -45,8 +50,18 @@ export default function JobCard({ job }) {
 					)}
 				</div>
 			)}
+			{job.applied || job.eligibleByExperience === false ? (
+				<div className="jobs-card-status">
+					<span className="jobs-card-availability">
+						<span className="jobs-card-availability-icon" aria-hidden="true">
+							{job.applied ? "✓" : "!"}
+						</span>
+						{job.applied ? "Already Applied" : "Not Eligible"}
+					</span>
+				</div>
+			) : null}
 			<span className="jobs-card-link">
-				View job details <span aria-hidden="true">→</span>
+				View Job Details <span aria-hidden="true">→</span>
 			</span>
 		</Link>
 	);

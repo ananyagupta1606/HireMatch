@@ -82,6 +82,24 @@ router.get(
 			jobs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 		}
 
+		if (profile) {
+			const appliedJobs = await Application.find({
+				candidate: req.user._id,
+				job: { $in: jobs.map((job) => job._id) },
+				stage: { $ne: "withdrawn" },
+			})
+				.select("job")
+				.lean();
+			const appliedJobIds = new Set(
+				appliedJobs.map((application) => String(application.job)),
+			);
+
+			jobs = jobs.map((job) => ({
+				...job,
+				applied: appliedJobIds.has(String(job._id)),
+			}));
+		}
+
 		const total = jobs.length;
 		const start = (page - 1) * limit;
 		const paginatedJobs = jobs.slice(start, start + limit);
@@ -257,14 +275,39 @@ router.post(
 			skills,
 			location,
 			workMode,
-			minExp,
-			ctcMin,
-			ctcMax,
 		} = req.body;
 
 		if (!title || !description || !location) {
 			return res.status(400).json({
 				message: "Title, description and location are required",
+			});
+		}
+
+		const numericValues = {};
+		for (const field of ["minExp", "ctcMin", "ctcMax"]) {
+			const rawValue = req.body[field];
+			if (rawValue === undefined) {
+				numericValues[field] = 0;
+				continue;
+			}
+
+			const value = Number(rawValue);
+			if (
+				rawValue === null ||
+				rawValue === "" ||
+				!Number.isFinite(value) ||
+				value < 0
+			) {
+				return res.status(400).json({
+					message: `${field} must be a non-negative number`,
+				});
+			}
+			numericValues[field] = value;
+		}
+
+		if (numericValues.ctcMin > numericValues.ctcMax) {
+			return res.status(400).json({
+				message: "Minimum CTC cannot exceed maximum CTC",
 			});
 		}
 
@@ -276,9 +319,9 @@ router.post(
 			location,
 			workMode,
 			skills: cleanSkills(skills),
-			minExp: Number(minExp) || 0,
-			ctcMin: Number(ctcMin) || 0,
-			ctcMax: Number(ctcMax) || 0,
+			minExp: numericValues.minExp,
+			ctcMin: numericValues.ctcMin,
+			ctcMax: numericValues.ctcMax,
 		});
 
 		if (job.skills.length > 0) {

@@ -1,26 +1,41 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useLocation } from "react-router-dom";
 import api, { errMsg } from "../api.js";
 import { useAuth } from "../AuthContext.jsx";
 import MatchRing from "../components/MatchRing.jsx";
+import { formatLabel } from "../format.js";
 
 export default function JobDetail() {
 	const { id } = useParams();
+	const location = useLocation();
 	const { user } = useAuth();
+	const detailPageClass =
+		user?.role === "recruiter"
+			? "job-detail-page is-recruiter"
+			: "job-detail-page is-candidate";
 
 	const [job, setJob] = useState(null);
 	const [note, setNote] = useState("");
 	const [msg, setMsg] = useState({ type: "", text: "" });
 	const [error, setError] = useState("");
 
+	const returnToApplications = location.state?.from === "applications";
 	const backLink = (
 		<Link
 			className="btn ghost small job-detail-back"
-			to={user?.role === "recruiter" ? "/dashboard" : "/"}
+			to={
+				user?.role === "recruiter"
+					? "/dashboard"
+					: returnToApplications
+						? "/applications"
+						: "/"
+			}
 		>
 			{user?.role === "recruiter"
-				? "← Back to dashboard"
-				: "← Back to jobs"}
+				? "← Back to Dashboard"
+				: returnToApplications
+					? "← Back to My Applications"
+					: "← Back to Jobs"}
 		</Link>
 	);
 
@@ -65,7 +80,7 @@ export default function JobDetail() {
 
 	if (error) {
 		return (
-			<div className="job-detail-page">
+			<div className={detailPageClass}>
 				{backLink}
 				<div className="job-detail-state job-detail-state--error" role="alert">
 					<h2>We couldn’t load this job</h2>
@@ -77,7 +92,7 @@ export default function JobDetail() {
 
 	if (!job) {
 		return (
-			<div className="job-detail-page">
+			<div className={detailPageClass}>
 				{backLink}
 				<div className="job-detail-state" role="status">
 					<span className="jobs-state-spinner" aria-hidden="true" />
@@ -101,7 +116,7 @@ export default function JobDetail() {
 				candidateExperience < experienceRequired));
 
 	return (
-		<div className="job-detail-page">
+		<div className={detailPageClass}>
 			{backLink}
 			<div className="job-detail-layout">
 				<article className="job-detail-content">
@@ -111,8 +126,8 @@ export default function JobDetail() {
 							<h1>{job.title}</h1>
 							<p className="job-detail-company">{job.company}</p>
 							<div className="job-detail-meta">
-								<span>{job.location}</span>
-								<span>{job.workMode}</span>
+								<span>{formatLabel(job.location)}</span>
+								<span>{formatLabel(job.workMode)}</span>
 								<span>{job.minExp}+ yrs experience</span>
 								<span>{job.ctcMin}–{job.ctcMax} LPA</span>
 							</div>
@@ -148,7 +163,7 @@ export default function JobDetail() {
 											: ""
 									}`}
 								>
-									{skill}
+									{formatLabel(skill)}
 								</span>
 							))}
 						</div>
