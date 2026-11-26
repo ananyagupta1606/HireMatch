@@ -29,4 +29,25 @@ const notificationSchema = new Schema(
 
 notificationSchema.index({ recipient: 1, createdAt: -1 });
 
+notificationSchema.statics.pruneForRecipient = async function (recipient) {
+	const keptRead = await this.find({
+		recipient,
+		readAt: { $ne: null },
+	})
+		.sort({ createdAt: -1 })
+		.limit(5)
+		.select("_id")
+		.lean();
+
+	await this.deleteMany({
+		recipient,
+		readAt: { $ne: null },
+		_id: { $nin: keptRead.map((notification) => notification._id) },
+	});
+};
+
+notificationSchema.post("save", async function (notification) {
+	await notification.constructor.pruneForRecipient(notification.recipient);
+});
+
 module.exports = model("Notification", notificationSchema);

@@ -55,6 +55,7 @@ function PasswordField({
 
 export default function Account() {
 	const { user, updateUser, logout } = useAuth();
+	const isRecruiter = user.role === "recruiter";
 	const navigate = useNavigate();
 	const [details, setDetails] = useState({
 		name: user.name,
@@ -186,9 +187,9 @@ export default function Account() {
 		<main className="profile-page account-page">
 			<header className="profile-heading">
 				<div>
-					<span className="profile-eyebrow">RECRUITER SETTINGS</span>
+					<span className="profile-eyebrow">ACCOUNT SETTINGS</span>
 					<h1>My Account</h1>
-					<p>Manage your personal and company account details.</p>
+					<p>Manage your personal account details.</p>
 				</div>
 			</header>
 
@@ -198,7 +199,11 @@ export default function Account() {
 						<div className="section-heading">
 							<div>
 								<h2>Account details</h2>
-								<p>Your company name will appear on new job postings.</p>
+								<p>
+									{isRecruiter
+										? "Your company name will appear on new job postings."
+										: "Update the name and email address associated with your account."}
+								</p>
 							</div>
 						</div>
 
@@ -226,17 +231,19 @@ export default function Account() {
 							/>
 						</label>
 
-						<label className="profile-label">
-							Company
-							<input
-								type="text"
-								value={details.company}
-								onChange={updateField("company")}
-								autoComplete="organization"
-								maxLength={120}
-								required
-							/>
-						</label>
+						{isRecruiter && (
+							<label className="profile-label">
+								Company
+								<input
+									type="text"
+									value={details.company}
+									onChange={updateField("company")}
+									autoComplete="organization"
+									maxLength={120}
+									required
+								/>
+							</label>
+						)}
 					</section>
 
 					<button
@@ -332,24 +339,25 @@ export default function Account() {
 					</footer>
 				</form>
 
-				<div className="account-danger-zone">
-					<div className="account-danger-toggle-row">
-						<div className="account-danger-copy">
-							<p>
-								Deleting your account closes open jobs and preserves application history.
-							</p>
+				{isRecruiter && (
+					<div className="account-danger-zone">
+						<div className="account-danger-toggle-row">
+							<div className="account-danger-copy">
+								<p>
+									Deleting your account closes open jobs and preserves application history.
+								</p>
+							</div>
+							<button
+								className="account-delete-toggle"
+								type="button"
+								aria-expanded={deleteFieldsOpen}
+								aria-controls={deleteFieldsOpen ? "account-delete-content" : undefined}
+								onClick={toggleDeleteFields}
+								disabled={saving || deleting}
+							>
+								{deleteFieldsOpen ? "Cancel deletion" : "Delete account"}
+							</button>
 						</div>
-						<button
-							className="account-delete-toggle"
-							type="button"
-							aria-expanded={deleteFieldsOpen}
-							aria-controls={deleteFieldsOpen ? "account-delete-content" : undefined}
-							onClick={toggleDeleteFields}
-							disabled={saving || deleting}
-						>
-							{deleteFieldsOpen ? "Cancel deletion" : "Delete account"}
-						</button>
-					</div>
 
 					{deleteFieldsOpen && (
 						<div
@@ -412,7 +420,8 @@ export default function Account() {
 							</form>
 						</div>
 					)}
-				</div>
+					</div>
+				)}
 			</section>
 		</main>
 	);

@@ -237,6 +237,7 @@ router.get(
 			job.applied = !!(await Application.exists({
 				job: job._id,
 				candidate: req.user._id,
+				stage: { $ne: "withdrawn" },
 			}));
 		}
 
@@ -296,6 +297,19 @@ router.post(
 						message: `${job.title} at ${job.company} matches skills on your profile.`,
 						link: `/jobs/${job._id}`,
 					})),
+				);
+				const recipientIds = [
+					...new Map(
+						matchingProfiles.map((profile) => [
+							profile.userId.toString(),
+							profile.userId,
+						]),
+					).values(),
+				];
+				await Promise.all(
+					recipientIds.map((recipient) =>
+						Notification.pruneForRecipient(recipient),
+					),
 				);
 			}
 		}

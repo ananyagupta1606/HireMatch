@@ -12,6 +12,7 @@ const appSchema = new Schema(
 				"interview",
 				"offered",
 				"rejected",
+				"withdrawn",
 			],
 			default: "applied",
 		},

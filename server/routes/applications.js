@@ -55,11 +55,44 @@ router.post(
 			});
 		}
 
+		const applicationCoverNote =
+			typeof coverNote === "string" ? coverNote.slice(0, 1000) : "";
+		const reactivated = await Application.findOneAndUpdate(
+			{
+				job: job._id,
+				candidate: req.user._id,
+				stage: "withdrawn",
+			},
+			{
+				$set: {
+					stage: "applied",
+					coverNote: applicationCoverNote,
+				},
+				$unset: { interviewAt: 1 },
+				$push: {
+					stageHistory: { stage: "applied", at: new Date() },
+				},
+			},
+			{ new: true, runValidators: true },
+		);
+
+		if (reactivated) {
+			await Notification.create({
+				recipient: job.recruiter,
+				type: "application_received",
+				title: "Candidate reapplied",
+				message: `${req.user.name} reapplied for ${job.title}.`,
+				link: `/dashboard/jobs/${job._id}`,
+			});
+
+			return res.status(200).json(reactivated);
+		}
+
 		try {
 			const app = await Application.create({
 				job: job._id,
 				candidate: req.user._id,
-				coverNote: (coverNote || "").slice(0, 1000),
+				coverNote: applicationCoverNote,
 				stageHistory: [{ stage: "applied" }],
 			});
 
@@ -99,6 +132,68 @@ router.get(
 			.lean();
 
 		res.json(apps);
+	}),
+);
+
+// PATCH /api/applications/:id/withdraw
+// Candidates can withdraw applications that are still in progress.
+router.patch(
+	"/:id/withdraw",
+	protect,
+	allow("candidate"),
+	wrap(async (req, res) => {
+		const application = await Application.findOne({
+			_id: req.params.id,
+			candidate: req.user._id,
+		}).populate("job", "recruiter title");
+
+		if (!application || !application.job) {
+			return res.status(404).json({
+				message: "Application not found",
+			});
+		}
+
+		if (!["applied", "shortlisted", "interview"].includes(application.stage)) {
+			return res.status(400).json({
+				message: "Only active applications can be withdrawn.",
+			});
+		}
+
+		const withdrawnApplication = await Application.findOneAndUpdate(
+			{
+				_id: application._id,
+				candidate: req.user._id,
+				stage: application.stage,
+			},
+			{
+				$set: { stage: "withdrawn" },
+				$unset: { interviewAt: 1 },
+				$push: {
+					stageHistory: { stage: "withdrawn", at: new Date() },
+				},
+			},
+			{ new: true, runValidators: true },
+		).populate("job", "recruiter title");
+
+		if (!withdrawnApplication) {
+			return res.status(409).json({
+				message: "Application status changed. Refresh and try again.",
+			});
+		}
+
+		await Notification.create({
+			recipient: withdrawnApplication.job.recruiter,
+			type: "application_status",
+			title: "Application withdrawn",
+			message: `${req.user.name} withdrew their application for ${withdrawnApplication.job.title}.`,
+			link: `/dashboard/jobs/${withdrawnApplication.job._id}`,
+		});
+
+		res.json({
+			_id: withdrawnApplication._id,
+			stage: withdrawnApplication.stage,
+			interviewAt: withdrawnApplication.interviewAt || null,
+		});
 	}),
 );
 

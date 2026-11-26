@@ -9,6 +9,7 @@ const APPLICANT_STAGES = [
   ['interview', 'Interview'],
   ['offered', 'Offered'],
   ['rejected', 'Rejected'],
+  ['withdrawn', 'Withdrawn'],
 ];
 
 const parseSkills = (value) => {
@@ -411,19 +412,19 @@ export default function Dashboard() {
       {jobToDelete && (
         <div className="recruiter-modal-backdrop">
           <section
-            className="recruiter-confirm-dialog"
+            className="confirm-dialog"
             role="alertdialog"
             aria-modal="true"
             aria-labelledby="delete-job-title"
             aria-describedby="delete-job-description"
           >
-            <div className="recruiter-confirm-icon" aria-hidden="true">!</div>
+            <div className="confirm-icon" aria-hidden="true">!</div>
             <h2 id="delete-job-title">Delete this job opening?</h2>
             <p id="delete-job-description">
               <strong>{jobToDelete.title}</strong> will be hidden from candidates. Applicant records and history will be preserved.
             </p>
             {msg.type === 'error' && <p className="error" role="alert">{msg.text}</p>}
-            <div className="recruiter-confirm-actions">
+            <div className="confirm-actions">
               <button
                 type="button"
                 className="btn ghost"

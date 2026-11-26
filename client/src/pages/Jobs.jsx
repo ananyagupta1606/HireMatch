@@ -29,6 +29,7 @@ export default function Jobs() {
 
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState("");
+	const activeFilterCount = Object.values(filters).filter(Boolean).length;
 
 	const set = (key) => (e) => {
 		setForm((prev) => ({
@@ -72,127 +73,203 @@ export default function Jobs() {
 	};
 
 	return (
-		<>
-			<h1>Find a role that fits your skills</h1>
-
-			{user?.role === "candidate" ? (
-				<p className="muted">
-					The ring on each card shows how many of the job's skills you
-					already have. <Link to="/profile">Update your skills</Link>{" "}
-					to improve it.
-				</p>
-			) : (
-				!user && (
-					<p className="muted">
-						<Link to="/register">Sign up as a candidate</Link> to
-						see your skill match on every job.
+		<div className="jobs-page">
+			<section className="jobs-hero">
+				<div className="jobs-hero-copy">
+					<span className="jobs-eyebrow">YOUR NEXT CHAPTER</span>
+					<h1>Find a role that fits you.</h1>
+					<p>
+						Explore opportunities that match your skills, goals, and
+						the way you want to work.
 					</p>
-				)
-			)}
+					{user?.role === "candidate" ? (
+						<p className="jobs-match-note">
+							Your skill match appears on each job.{" "}
+							<Link to="/profile">Keep your skills up to date</Link>
+							.
+						</p>
+					) : (
+						!user && (
+							<p className="jobs-match-note">
+								<Link to="/register">Create a candidate account</Link>{" "}
+								to see your skill match on every job.
+							</p>
+						)
+					)}
+				</div>
+				<div className="jobs-hero-art" aria-hidden="true">
+					<div className="jobs-art-orbit jobs-art-orbit--one" />
+					<div className="jobs-art-orbit jobs-art-orbit--two" />
+					<div className="jobs-art-card">
+						<span className="jobs-art-mark">H</span>
+						<span className="jobs-art-line jobs-art-line--long" />
+						<span className="jobs-art-line" />
+						<span className="jobs-art-pills">
+							<i />
+							<i />
+							<i />
+						</span>
+						<span className="jobs-art-check">✓</span>
+					</div>
+				</div>
+			</section>
 
-			<form className="filters card" onSubmit={search}>
-				<input
-					placeholder="Job title"
-					value={form.role}
-					onChange={set("role")}
-				/>
-
-				<input
-					placeholder="Location"
-					value={form.location}
-					onChange={set("location")}
-				/>
-
-				<select value={form.workMode} onChange={set("workMode")}>
-					<option value="">Any work mode</option>
-					<option value="onsite">Onsite</option>
-					<option value="hybrid">Hybrid</option>
-					<option value="remote">Remote</option>
-				</select>
-
-				{/* Separate experience-level filter */}
-				<select
-					value={form.experienceLevel}
-					onChange={set("experienceLevel")}
-				>
-					<option value="">All experience levels</option>
-					<option value="0">Fresher (0+ years required)</option>
-					<option value="1">1+ years required</option>
-					<option value="2">2+ years required</option>
-					<option value="3">3+ years required</option>
-					<option value="4">4+ years required</option>
-					<option value="5">5+ years required</option>
-				</select>
-
-				<input
-					type="number"
-					min="0"
-					placeholder="Min CTC (LPA)"
-					value={form.ctc}
-					onChange={set("ctc")}
-				/>
-
-				<input
-					placeholder="Skills: react, node"
-					value={form.skills}
-					onChange={set("skills")}
-				/>
-
-				<button type="submit" className="btn">
-					Search
-				</button>
-
-				<button type="button" className="link" onClick={reset}>
-					Clear
-				</button>
+			<form className="jobs-filters" onSubmit={search}>
+				<div className="jobs-filter-heading">
+					<div>
+						<span className="jobs-section-kicker">OPPORTUNITIES</span>
+						<h2>Find your next role</h2>
+					</div>
+					{activeFilterCount > 0 && (
+						<span className="jobs-active-filters">
+							{activeFilterCount} filter
+							{activeFilterCount === 1 ? "" : "s"} applied
+						</span>
+					)}
+				</div>
+				<div className="jobs-filter-fields">
+					<label>
+						Job title or keyword
+						<input
+							placeholder="e.g. Product designer"
+							value={form.role}
+							onChange={set("role")}
+						/>
+					</label>
+					<label>
+						Location
+						<input
+							placeholder="e.g. Bengaluru"
+							value={form.location}
+							onChange={set("location")}
+						/>
+					</label>
+					<label>
+						Work mode
+						<select value={form.workMode} onChange={set("workMode")}>
+							<option value="">Any work mode</option>
+							<option value="onsite">Onsite</option>
+							<option value="hybrid">Hybrid</option>
+							<option value="remote">Remote</option>
+						</select>
+					</label>
+					<label>
+						Experience
+						<select
+							value={form.experienceLevel}
+							onChange={set("experienceLevel")}
+						>
+							<option value="">All experience levels</option>
+							<option value="0">Fresher (0+ years)</option>
+							<option value="1">1+ years</option>
+							<option value="2">2+ years</option>
+							<option value="3">3+ years</option>
+							<option value="4">4+ years</option>
+							<option value="5">5+ years</option>
+						</select>
+					</label>
+					<label>
+						Minimum salary
+						<input
+							type="number"
+							min="0"
+							placeholder="LPA"
+							value={form.ctc}
+							onChange={set("ctc")}
+						/>
+					</label>
+					<label>
+						Skills
+						<input
+							placeholder="e.g. React, Node"
+							value={form.skills}
+							onChange={set("skills")}
+						/>
+					</label>
+				</div>
+				<div className="jobs-filter-actions">
+					<button type="submit" className="btn">
+						Search jobs <span aria-hidden="true">→</span>
+					</button>
+					<button type="button" className="jobs-clear-button" onClick={reset}>
+						Clear filters
+					</button>
+				</div>
 			</form>
 
-			{error && <p className="error">{error}</p>}
-
-			{loading ? (
-				<p className="muted">Loading jobs…</p>
-			) : (
-				<>
-					<p className="muted">
-						{data.total} job{data.total === 1 ? "" : "s"} found
-					</p>
-
-					{data.jobs.length === 0 && (
-						<p>No jobs match these filters. Try removing one.</p>
+			<section className="jobs-results" aria-live="polite">
+				<div className="jobs-results-heading">
+					<div>
+						<span className="jobs-section-kicker">CURATED FOR YOU</span>
+						<h2>{loading ? "Browse open roles" : "Open roles"}</h2>
+					</div>
+					{!loading && !error && (
+						<span className="jobs-result-count">
+							<strong>{data.total}</strong>{" "}
+							{data.total === 1 ? "opportunity" : "opportunities"}
+						</span>
 					)}
+				</div>
 
-					{/* Backend returns jobs in the correct order */}
-					<div className="grid">
+				{error ? (
+					<div className="jobs-empty-state jobs-error-state" role="alert">
+						<span className="jobs-empty-icon" aria-hidden="true">!</span>
+						<h3>We couldn’t load the jobs</h3>
+						<p>{error}</p>
+					</div>
+				) : loading ? (
+					<div className="jobs-grid" role="status" aria-label="Loading jobs">
+						{[0, 1, 2].map((item) => (
+							<div className="jobs-skeleton" key={item}>
+								<span />
+								<span />
+								<span />
+								<span />
+							</div>
+						))}
+					</div>
+				) : data.jobs.length === 0 ? (
+					<div className="jobs-empty-state">
+						<span className="jobs-empty-icon" aria-hidden="true">⌕</span>
+						<h3>No roles found this time</h3>
+						<p>Try a broader search or clear your filters to see more opportunities.</p>
+						<button type="button" className="btn ghost" onClick={reset}>
+							Clear all filters
+						</button>
+					</div>
+				) : (
+					<div className="jobs-grid">
 						{data.jobs.map((job) => (
 							<JobCard key={job._id} job={job} />
 						))}
 					</div>
+				)}
 
-					<div className="pager">
+				{!loading && !error && data.pages > 1 && (
+					<div className="jobs-pager">
 						<button
 							type="button"
 							className="btn ghost"
 							disabled={page <= 1}
 							onClick={() => setPage((prev) => prev - 1)}
 						>
-							Previous
+							← Previous
 						</button>
-
 						<span>
-							Page {data.page || page} of {data.pages}
+							Page <strong>{data.page || page}</strong> of{" "}
+							<strong>{data.pages}</strong>
 						</span>
-
 						<button
 							type="button"
 							className="btn ghost"
 							disabled={page >= data.pages}
 							onClick={() => setPage((prev) => prev + 1)}
 						>
-							Next
+							Next →
 						</button>
 					</div>
-				</>
-			)}
-		</>
+				)}
+			</section>
+		</div>
 	);
 }

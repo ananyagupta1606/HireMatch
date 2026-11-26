@@ -4,7 +4,12 @@ import api, { errMsg } from '../api.js';
 import MatchRing from '../components/MatchRing.jsx';
 import StageBar from '../components/StageBar.jsx';
 
-const STAGES = ['applied', 'shortlisted', 'interview', 'offered', 'rejected'];
+const STAGES = ['applied', 'shortlisted', 'interview', 'offered', 'rejected', 'withdrawn'];
+
+const lastAppliedAt = (application) => {
+  const history = [...(application.stageHistory || [])].reverse();
+  return history.find((entry) => entry.stage === 'applied')?.at || application.createdAt;
+};
 
 const toLocalDateTime = (value) => {
   if (!value) return '';
@@ -72,7 +77,7 @@ export default function Applicants() {
     })
     .sort((a, b) => {
       if (sortBy === 'newest') {
-        return new Date(b.createdAt) - new Date(a.createdAt);
+        return new Date(lastAppliedAt(b)) - new Date(lastAppliedAt(a));
       }
       if (sortBy === 'experience') {
         const experienceDifference =
@@ -204,7 +209,10 @@ export default function Applicants() {
 
   return (
     <>
-      <Link to="/dashboard">← Back to dashboard</Link>
+      <Link className="back-link" to="/dashboard">
+        <span className="back-link-arrow" aria-hidden="true">←</span>
+        <span>Back to dashboard</span>
+      </Link>
       <h1>{data.job.title}: applicants</h1>
       {error && <p className="error" role="alert">{error}</p>}
       {message && <p className="ok" role="status">{message}</p>}
@@ -265,15 +273,30 @@ export default function Applicants() {
             <p className="muted">
               {a.profile?.headline || 'No profile yet'}
               {a.profile && ` · ${a.profile.experienceYears} yrs`}
-              {` · applied ${new Date(a.createdAt).toLocaleDateString()}`}
+              {` · applied ${new Date(lastAppliedAt(a)).toLocaleDateString()}`}
             </p>
             <div className="chips">
               {(a.profile?.skills || []).map((skill) => (
-                <span key={skill} className="chip">{skill}</span>
+                <span
+                  key={skill}
+                  className={`chip ${
+                    a.match.missing.some(
+                      (missing) => missing.toLowerCase() === skill.toLowerCase()
+                    )
+                      ? 'miss'
+                      : 'hit'
+                  }`}
+                >
+                  {skill}
+                </span>
               ))}
             </div>
             {a.match.missing.length > 0 && (
-              <p className="muted">Missing: {a.match.missing.join(', ')}</p>
+              <div className="chips applicant-missing-skills" aria-label="Missing skills">
+                {a.match.missing.map((skill) => (
+                  <span key={skill} className="chip miss">{skill}</span>
+                ))}
+              </div>
             )}
             {a.coverNote && <p className="note">“{a.coverNote}”</p>}
             {a.profile?.resume && (

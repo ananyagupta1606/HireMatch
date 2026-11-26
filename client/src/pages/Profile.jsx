@@ -25,7 +25,14 @@ const SKILL_CATEGORIES = {
   ],
 };
 
+const SKILL_LABELS = new Map(
+  Object.values(SKILL_CATEGORIES)
+    .flat()
+    .map((skill) => [skill.toLowerCase(), skill])
+);
+
 const normalizeSkill = (skill) => skill.trim();
+const displaySkill = (skill) => SKILL_LABELS.get(skill.toLowerCase()) || skill;
 
 export default function Profile() {
   const [f, setF] = useState({
@@ -89,11 +96,21 @@ export default function Profile() {
     setMsg({ type: '', text: '' });
   };
 
+  const toggleSkillFromPicker = (skill) => {
+    toggleSkill(skill);
+    setSearch('');
+    setActiveCategory('All');
+  };
+
   const addCustomSkill = (e) => {
     e.preventDefault();
 
-    const skill = normalizeSkill(search);
-    if (!skill) return;
+    const enteredSkill = normalizeSkill(search);
+    if (!enteredSkill) return;
+    const skill = Object.values(SKILL_CATEGORIES)
+      .flat()
+      .find((suggested) => suggested.toLowerCase() === enteredSkill.toLowerCase())
+      || enteredSkill;
 
     const exists = f.skills.some(
       (item) => item.toLowerCase() === skill.toLowerCase()
@@ -110,6 +127,7 @@ export default function Profile() {
     }));
 
     setSearch('');
+    setActiveCategory('All');
     setMsg({ type: '', text: '' });
   };
 
@@ -123,6 +141,14 @@ export default function Profile() {
     .filter(({ skill }) =>
       skill.toLowerCase().includes(search.trim().toLowerCase())
     );
+
+  const matchingSuggestedSkill = Object.entries(SKILL_CATEGORIES)
+    .flatMap(([category, skills]) => skills.map((skill) => ({ category, skill })))
+    .find(({ skill }) => skill.toLowerCase() === search.trim().toLowerCase());
+  const skillToAdd = matchingSuggestedSkill?.skill || normalizeSkill(search);
+  const searchSkillSelected = f.skills.some(
+    (skill) => skill.toLowerCase() === skillToAdd.toLowerCase()
+  );
 
   const save = async (e) => {
     e.preventDefault();
@@ -300,10 +326,19 @@ export default function Profile() {
 
           {resume && (
             <div className="resume-current">
-              <span>
-                Current resume: <strong>{resume.originalName}</strong>
-              </span>
-              <div className="actions">
+              <div className="resume-current-main">
+                <span className="resume-file-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none">
+                    <path d="M7 3.75h6.5L19 9.2v10.05a1 1 0 0 1-1 1H7a2 2 0 0 1-2-2v-12a2.5 2.5 0 0 1 2-2.5Z" />
+                    <path d="M13 4v5.5h5.5M8.5 13h7M8.5 16h7" />
+                  </svg>
+                </span>
+                <span className="resume-current-details">
+                  <span className="resume-current-label">Current resume</span>
+                  <strong>{resume.originalName}</strong>
+                </span>
+              </div>
+              <div className="actions resume-current-actions">
                 <button
                   type="button"
                   className="btn ghost small"
@@ -325,7 +360,9 @@ export default function Profile() {
           )}
 
           <label className="profile-label resume-upload-label">
-            {resume ? 'Choose a replacement resume' : 'Choose a resume'}
+            <span className="resume-upload-title">
+              {resume ? 'Choose a replacement resume' : 'Choose a resume'}
+            </span>
             <input
               ref={resumeInput}
               type="file"
@@ -335,7 +372,9 @@ export default function Profile() {
           </label>
 
           {selectedResume && (
-            <p className="field-hint">Selected: {selectedResume.name}</p>
+            <p className="field-hint resume-selected-file">
+              Ready to upload: <strong>{selectedResume.name}</strong>
+            </p>
           )}
 
           <button
@@ -359,19 +398,22 @@ export default function Profile() {
 
           <div className="selected-skills">
             {f.skills.length > 0 ? (
-              f.skills.map((skill) => (
-                <span className="selected-skill" key={skill.toLowerCase()}>
-                  {skill}
-                  <button
-                    type="button"
-                    onClick={() => toggleSkill(skill)}
-                    aria-label={`Remove ${skill}`}
-                    title={`Remove ${skill}`}
-                  >
-                    ×
-                  </button>
-                </span>
-              ))
+              f.skills.map((skill) => {
+                const label = displaySkill(skill);
+                return (
+                  <span className="selected-skill" key={skill.toLowerCase()}>
+                    {label}
+                    <button
+                      type="button"
+                      onClick={() => toggleSkill(skill)}
+                      aria-label={`Remove ${label}`}
+                      title={`Remove ${label}`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                );
+              })
             ) : (
               <p className="empty-skills">
                 No skills selected yet. Choose some below to get started.
@@ -424,7 +466,7 @@ export default function Profile() {
                   type="button"
                   key={skill}
                   className={`skill-option ${selected ? 'selected' : ''}`}
-                  onClick={() => toggleSkill(skill)}
+                  onClick={() => toggleSkillFromPicker(skill)}
                   aria-pressed={selected}
                   title={category}
                 >
@@ -438,19 +480,22 @@ export default function Profile() {
 
             {availableSkills.length === 0 && (
               <p className="no-skills">
-                No suggested skills found. You can add "{search.trim()}" as a
-                custom skill.
+                {matchingSuggestedSkill
+                  ? `${matchingSuggestedSkill.skill} is a suggested skill in ${matchingSuggestedSkill.category}.`
+                  : `No suggested skills found. You can add "${search.trim()}" as a custom skill.`}
               </p>
             )}
           </div>
 
-          {search.trim() && (
+          {search.trim() && !searchSkillSelected && (
             <button
               type="button"
               className="custom-skill-button"
               onClick={addCustomSkill}
             >
-              + Add "{search.trim()}" as a custom skill
+              {matchingSuggestedSkill
+                ? `Select ${matchingSuggestedSkill.skill}`
+                : `+ Add "${search.trim()}" as a custom skill`}
             </button>
           )}
 

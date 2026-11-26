@@ -200,25 +200,20 @@ router.get("/me", protect, (req, res) =>
 	res.json({ user: pub(req.user) }),
 );
 
-// Update the authenticated recruiter's account details.
+// Update the authenticated user's account details.
 router.put(
 	"/me",
 	protect,
 	wrap(async (req, res) => {
-		if (req.user.role !== "recruiter") {
-			return res.status(403).json({
-				message: "Only recruiters can update account details here",
-			});
-		}
-
 		const body =
 			req.body && typeof req.body === "object" ? req.body : {};
 		const updates = {};
-		for (const [field, maxLength] of [
+		const fields = [
 			["name", 100],
 			["email", 254],
-			["company", 120],
-		]) {
+		];
+		if (req.user.role === "recruiter") fields.push(["company", 120]);
+		for (const [field, maxLength] of fields) {
 			if (body[field] === undefined) continue;
 			if (
 				typeof body[field] !== "string" ||
@@ -273,17 +268,11 @@ router.put(
 	}),
 );
 
-// Change or set a password for the authenticated recruiter.
+// Change or set a password for the authenticated user.
 router.patch(
 	"/me/password",
 	protect,
 	wrap(async (req, res) => {
-		if (req.user.role !== "recruiter") {
-			return res.status(403).json({
-				message: "Only recruiters can change passwords here",
-			});
-		}
-
 		const body =
 			req.body && typeof req.body === "object" ? req.body : {};
 		const newPassword = body.newPassword;

@@ -95,7 +95,7 @@ export default function App() {
 					<Route
 						path="/account"
 						element={
-							<Guard role="recruiter">
+							<Guard>
 								<Account />
 							</Guard>
 						}

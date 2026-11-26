@@ -63,10 +63,8 @@ export default function Notifications() {
 	const markAllRead = async () => {
 		try {
 			await api.patch("/notifications/read-all");
-			const readAt = new Date().toISOString();
-			setNotifications((current) =>
-				current.map((notification) => ({ ...notification, readAt })),
-			);
+			const { data } = await api.get("/notifications");
+			setNotifications(data);
 		} catch (e) {
 			setError(errMsg(e));
 		}
