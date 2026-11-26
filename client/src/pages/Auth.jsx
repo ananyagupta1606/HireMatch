@@ -61,6 +61,9 @@ export default function Auth({ mode }) {
     try {
       const { data } = await api.post('/auth/google', {
         credential: credentialResponse.credential,
+        intent: isReg ? 'register' : 'login',
+        role: f.role,
+        company: f.company,
       });
 
       finishLogin(data);

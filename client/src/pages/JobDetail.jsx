@@ -13,6 +13,17 @@ export default function JobDetail() {
 	const [msg, setMsg] = useState({ type: "", text: "" });
 	const [error, setError] = useState("");
 
+	const backLink = (
+		<Link
+			className="btn ghost small job-detail-back"
+			to={user?.role === "recruiter" ? "/dashboard" : "/"}
+		>
+			{user?.role === "recruiter"
+				? "← Back to dashboard"
+				: "← Back to jobs"}
+		</Link>
+	);
+
 	useEffect(() => {
 		setJob(null);
 		setError("");
@@ -53,11 +64,21 @@ export default function JobDetail() {
 	};
 
 	if (error) {
-		return <p className="error">{error}</p>;
+		return (
+			<>
+				{backLink}
+				<p className="error">{error}</p>
+			</>
+		);
 	}
 
 	if (!job) {
-		return <p className="muted">Loading…</p>;
+		return (
+			<>
+				{backLink}
+				<p className="muted">Loading…</p>
+			</>
+		);
 	}
 
 	// Check whether the candidate meets the minimum experience requirement.
@@ -75,6 +96,7 @@ export default function JobDetail() {
 
 	return (
 		<div className="card detail">
+			{backLink}
 			<div className="job-top">
 				<div>
 					<h1>{job.title}</h1>

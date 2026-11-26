@@ -24,9 +24,9 @@ const getCandidateProfile = async (user) => {
     return profile || {
         skills: [],
         experienceYears: 0,
+        preferredLocation: "",
     };
 };
-;
 
 // GET /api/jobs
 router.get(
@@ -91,6 +91,66 @@ router.get(
 			total,
 			page,
 			pages: Math.ceil(total / limit) || 1,
+		});
+	}),
+);
+
+// GET /api/jobs/recommendations
+router.get(
+	"/recommendations",
+	protect,
+	allow("candidate"),
+	wrap(async (req, res) => {
+		const profile = await getCandidateProfile(req.user);
+		const jobs = await Job.find({ status: "open" })
+			.sort({ createdAt: -1 })
+			.lean();
+		const candidateExperience = Number(profile.experienceYears ?? 0);
+		const preferredLocation = (profile.preferredLocation || "").trim();
+
+		const matchedJobs = jobs.map((job) => ({
+			...job,
+			match: matchScore(job.skills || [], profile.skills || []),
+			candidateExperience,
+			eligibleByExperience:
+				candidateExperience >= Number(job.minExp ?? 0),
+			locationMatch: preferredLocation
+				? new RegExp(esc(preferredLocation), "i").test(job.location)
+				: false,
+		}));
+
+		const sortByRelevance = (a, b) =>
+			b.match.score - a.match.score ||
+			Number(b.eligibleByExperience) - Number(a.eligibleByExperience) ||
+			Number(b.locationMatch) - Number(a.locationMatch) ||
+			new Date(b.createdAt) - new Date(a.createdAt);
+		const newestFirst = (a, b) =>
+			new Date(b.createdAt) - new Date(a.createdAt);
+		const limit = 6;
+
+		res.json({
+			profile: {
+				skills: profile.skills || [],
+				preferredLocation,
+			},
+			recommendations: {
+				recommended: [...matchedJobs].sort(sortByRelevance).slice(0, limit),
+				bestSkillMatches: matchedJobs
+					.filter((job) => job.match.score > 0)
+					.sort(sortByRelevance)
+					.slice(0, limit),
+				recentlyPosted: [...matchedJobs].sort(newestFirst).slice(0, limit),
+				experienceMatches: matchedJobs
+					.filter((job) => job.eligibleByExperience)
+					.sort(sortByRelevance)
+					.slice(0, limit),
+				preferredLocation: preferredLocation
+					? matchedJobs
+							.filter((job) => job.locationMatch)
+							.sort(sortByRelevance)
+							.slice(0, limit)
+					: [],
+			},
 		});
 	}),
 );

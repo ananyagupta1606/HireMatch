@@ -12,6 +12,7 @@ module.exports = model(
 			headline: { type: String, default: "" },
 			skills: { type: [String], index: true, default: [] }, // stored lowercase
 			experienceYears: { type: Number, default: 0 },
+			preferredLocation: { type: String, trim: true, maxlength: 100, default: "" },
 			expectedCtc: { type: Number, default: 0 }, // LPA
 			resume: {
 				type: new Schema(

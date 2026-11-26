@@ -191,7 +191,7 @@ hr {
 .notification-panel {
 	position: absolute;
 	z-index: 5;
-	top: calc(100% + 0.7rem);
+	top: 100%;
 	right: 0;
 	width: min(360px, calc(100vw - 2rem));
 	max-height: 420px;
@@ -403,6 +403,10 @@ textarea:disabled {
 .btn.small {
 	padding: 0.3rem 0.7rem;
 	font-size: 0.85rem;
+}
+
+.job-detail-back {
+	margin-bottom: 1rem;
 }
 
 .link {

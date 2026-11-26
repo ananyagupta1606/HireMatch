@@ -98,11 +98,17 @@ router.post(
 router.post(
 	"/google",
 	wrap(async (req, res) => {
-		const { credential } = req.body;
+		const { credential, intent, role, company } = req.body;
 
 		if (!credential) {
 			return res.status(400).json({
 				message: "Google credential is required",
+			});
+		}
+
+		if (!["register", "login"].includes(intent)) {
+			return res.status(400).json({
+				message: "Choose whether to sign up or log in",
 			});
 		}
 
@@ -148,12 +154,34 @@ router.post(
 				});
 			}
 
-			// Create a new candidate account.
+			// A login attempt must not register an account implicitly.
+			if (intent === "login") {
+				return res.status(404).json({
+					message: "No account found. Please sign up first.",
+				});
+			}
+
+			if (!["candidate", "recruiter"].includes(role)) {
+				return res.status(400).json({
+					message: "Choose candidate or recruiter",
+				});
+			}
+
+			if (
+				role === "recruiter" &&
+				(typeof company !== "string" || !company.trim())
+			) {
+				return res.status(400).json({
+					message: "Company name is required for recruiters",
+				});
+			}
+
 			user = await User.create({
 				name: payload.name || email.split("@")[0],
 				email,
 				googleId,
-				role: "candidate",
+				role,
+				company: role === "recruiter" ? company.trim() : undefined,
 			});
 		}
 
