@@ -21,14 +21,112 @@ const getStageHistory = (application) => {
 };
 
 const formatStage = (stage) => stage.charAt(0).toUpperCase() + stage.slice(1);
+const getInterviewMode = (details = {}) => (
+  details.mode || (details.meetingLink ? 'online' : details.location ? 'offline' : 'online')
+);
+
+const applicationFilters = [
+  { stage: 'all', label: 'All' },
+  { stage: 'applied', label: 'Applied' },
+  { stage: 'shortlisted', label: 'Shortlisted' },
+  { stage: 'interview', label: 'Interview' },
+  { stage: 'offered', label: 'Offered' },
+  { stage: 'rejected', label: 'Rejected' },
+  { stage: 'withdrawn', label: 'Withdrawn' },
+];
+
+const toLocalDateTime = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+    .toISOString()
+    .slice(0, 16);
+};
+
+const escapeCalendarText = (value = '') => String(value)
+  .replace(/\\/g, '\\\\')
+  .replace(/\r\n|\r|\n/g, '\\n')
+  .replace(/,/g, '\\,')
+  .replace(/;/g, '\\;');
+
+const foldCalendarLine = (line) => {
+  const encoder = new TextEncoder();
+  const segments = [];
+  let segment = '';
+  let byteLength = 0;
+
+  for (const character of line) {
+    const characterLength = encoder.encode(character).length;
+    if (byteLength + characterLength > 75) {
+      segments.push(segment);
+      segment = ` ${character}`;
+      byteLength = 1 + characterLength;
+    } else {
+      segment += character;
+      byteLength += characterLength;
+    }
+  }
+
+  segments.push(segment);
+  return segments.join('\r\n');
+};
+
+const downloadInterviewCalendar = (application) => {
+  const start = new Date(application.interviewAt);
+  const end = new Date(start.getTime() + (application.interviewDurationMinutes || 60) * 60_000);
+  const toCalendarDate = (date) => date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const details = application.interviewDetails || {};
+  const location = [details.location, details.meetingLink].filter(Boolean).join(' · ');
+  const description = [
+    `Interview for ${application.job.title}`,
+    details.instructions,
+    details.meetingLink,
+  ].filter(Boolean).join('\n\n');
+  const content = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//HireMatch//Interview//EN',
+    'CALSCALE:GREGORIAN',
+    'BEGIN:VEVENT',
+    `UID:${application._id}@hirematch`,
+    `DTSTAMP:${toCalendarDate(new Date())}`,
+    `DTSTART:${toCalendarDate(start)}`,
+    `DTEND:${toCalendarDate(end)}`,
+    `SUMMARY:${escapeCalendarText(`Interview: ${application.job.title}`)}`,
+    `LOCATION:${escapeCalendarText(location)}`,
+    `DESCRIPTION:${escapeCalendarText(description)}`,
+    'BEGIN:VALARM',
+    'ACTION:DISPLAY',
+    'DESCRIPTION:Interview reminder',
+    'TRIGGER:-PT30M',
+    'END:VALARM',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].map(foldCalendarLine).join('\r\n');
+  const url = URL.createObjectURL(new Blob([content], { type: 'text/calendar;charset=utf-8' }));
+  const link = document.createElement('a');
+  const jobSlug = application.job.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  link.href = url;
+  link.download = `${jobSlug || 'interview'}.ics`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+};
 
 export default function MyApplications() {
   const [apps, setApps] = useState(null);
+  const [selectedStage, setSelectedStage] = useState('all');
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
   const [actionMessage, setActionMessage] = useState('');
   const [withdrawingId, setWithdrawingId] = useState(null);
   const [applicationToWithdraw, setApplicationToWithdraw] = useState(null);
+  const [concernFormForId, setConcernFormForId] = useState(null);
+  const [concernMessage, setConcernMessage] = useState('');
+  const [concernPreferredAt, setConcernPreferredAt] = useState('');
+  const [savingConcernId, setSavingConcernId] = useState(null);
   const withdrawDialogRef = useRef(null);
 
   useEffect(() => {
@@ -60,6 +158,9 @@ export default function MyApplications() {
     if (application.stage === 'offered') counts.offers += 1;
     return counts;
   }, { total: 0, active: 0, interviews: 0, offers: 0 });
+  const visibleApps = selectedStage === 'all'
+    ? apps
+    : apps?.filter((application) => application.stage === selectedStage);
 
   const withdraw = async (application) => {
     setWithdrawingId(application._id);
@@ -87,6 +188,36 @@ export default function MyApplications() {
       setActionError(errMsg(requestError));
     } finally {
       setWithdrawingId(null);
+    }
+  };
+
+  const submitInterviewConcern = async (application) => {
+    setSavingConcernId(application._id);
+    setActionError('');
+    setActionMessage('');
+    try {
+      const { data } = await api.post(
+        `/applications/${application._id}/interview-concern`,
+        {
+          message: concernMessage,
+          preferredAt: concernPreferredAt
+            ? new Date(concernPreferredAt).toISOString()
+            : null,
+        },
+      );
+      setApps((current) => current.map((item) => (
+        item._id === application._id
+          ? { ...item, interviewConcern: data.interviewConcern }
+          : item
+      )));
+      setConcernFormForId(null);
+      setConcernMessage('');
+      setConcernPreferredAt('');
+      setActionMessage('Your scheduling concern was sent to the recruiter.');
+    } catch (requestError) {
+      setActionError(errMsg(requestError));
+    } finally {
+      setSavingConcernId(null);
     }
   };
 
@@ -125,13 +256,34 @@ export default function MyApplications() {
             <h2 id="application-list-title">Application activity</h2>
             <p>
               {apps
-                ? `${apps.length} ${apps.length === 1 ? 'opportunity' : 'opportunities'} in your pipeline`
+                ? `${visibleApps.length} ${visibleApps.length === 1 ? 'opportunity' : 'opportunities'}${selectedStage === 'all' ? ' in your pipeline' : ` with status ${formatStage(selectedStage)}`}`
                 : 'Your applications will appear here.'}
             </p>
           </div>
         </div>
 
         {actionMessage && <p className="ok" role="status">{actionMessage}</p>}
+
+        {apps?.length > 0 && (
+          <nav className="candidate-application-filters" aria-label="Filter applications by status">
+            {applicationFilters.map(({ stage, label }) => {
+              const count = stage === 'all'
+                ? apps.length
+                : apps.filter((application) => application.stage === stage).length;
+              return (
+                <button
+                  type="button"
+                  className={`candidate-application-filter${selectedStage === stage ? ' is-active' : ''}`}
+                  key={stage}
+                  aria-pressed={selectedStage === stage}
+                  onClick={() => setSelectedStage(stage)}
+                >
+                  {label}<span>{count}</span>
+                </button>
+              );
+            })}
+          </nav>
+        )}
 
         {error ? (
           <div className="candidate-state-card candidate-state-card--error" role="alert">
@@ -153,9 +305,17 @@ export default function MyApplications() {
             </p>
             <Link className="btn" to="/">Browse open jobs</Link>
           </div>
+        ) : visibleApps.length === 0 ? (
+          <div className="candidate-state-card candidate-state-card--empty">
+            <strong>No {formatStage(selectedStage).toLowerCase()} applications yet</strong>
+            <p>Applications with this status will appear here.</p>
+            <button type="button" className="btn ghost" onClick={() => setSelectedStage('all')}>
+              Show all applications
+            </button>
+          </div>
         ) : (
           <div className="candidate-application-list">
-            {apps.map((application) => (
+            {visibleApps.map((application) => (
               <article className="candidate-application-card" key={application._id}>
                 <div className="candidate-application-main">
                   <div className="candidate-application-heading">
@@ -174,11 +334,157 @@ export default function MyApplications() {
                     </div>
                   </div>
 
-                  {application.interviewAt && (
+                  {application.stage === 'interview' && !application.interviewAt && (
                     <p className="candidate-interview-notice">
-                      <span aria-hidden="true">◷</span>
-                      Interview scheduled: {new Date(application.interviewAt).toLocaleString()}
+                      Interview stage reached. The recruiter has not scheduled a time yet.
                     </p>
+                  )}
+
+                  {application.interviewAt && (
+                    <section className="candidate-interview-card" aria-label="Interview details">
+                      <div className="candidate-interview-heading">
+                        <div>
+                          <span className="candidate-dashboard-eyebrow">UPCOMING INTERVIEW</span>
+                          <h3>
+                            <time dateTime={new Date(application.interviewAt).toISOString()}>
+                              {new Date(application.interviewAt).toLocaleString()}
+                            </time>
+                          </h3>
+                          <p>
+                            Duration: {application.interviewDurationMinutes || 60} minutes
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn ghost small"
+                          onClick={() => downloadInterviewCalendar(application)}
+                        >
+                          Add to calendar
+                        </button>
+                      </div>
+                      {application.interviewDetails && (
+                        <div className="candidate-interview-logistics">
+                          <p>
+                            <strong>Format:</strong>{' '}
+                            {getInterviewMode(application.interviewDetails) === 'online'
+                              ? 'Online meeting'
+                              : 'Offline / in person'}
+                          </p>
+                          {getInterviewMode(application.interviewDetails) === 'offline'
+                            ? application.interviewDetails.location
+                              ? <p><strong>Address:</strong> {application.interviewDetails.location}</p>
+                              : <p>The recruiter will share the interview address.</p>
+                            : application.interviewDetails.meetingLink
+                              ? (
+                                <p>
+                                  <strong>Meeting link:</strong>{' '}
+                                  <a href={application.interviewDetails.meetingLink} target="_blank" rel="noopener noreferrer">
+                                    Join interview
+                                  </a>
+                                </p>
+                              )
+                              : <p>The recruiter will share the meeting link.</p>}
+                        </div>
+                      )}
+                      {application.interviewDetails?.instructions && (
+                        <p className="candidate-interview-instructions">
+                          {application.interviewDetails.instructions}
+                        </p>
+                      )}
+                      <p className="field-hint">
+                        The calendar event includes a reminder 30 minutes before the interview.
+                      </p>
+
+                      {application.interviewConcern && (
+                        <div className={`candidate-concern-status candidate-concern-status--${application.interviewConcern.status}`}>
+                          <strong>
+                            Scheduling concern {application.interviewConcern.status === 'pending' ? 'sent' : 'reviewed'}
+                          </strong>
+                          <p>{application.interviewConcern.message}</p>
+                          {application.interviewConcern.preferredAt && (
+                            <p>
+                              Your preferred alternative: {new Date(application.interviewConcern.preferredAt).toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {application.stage === 'interview' && (
+                        <>
+                          <button
+                            type="button"
+                            className="candidate-conflict-button"
+                            onClick={() => {
+                              setActionError('');
+                              setConcernFormForId(application._id);
+                              setConcernMessage(application.interviewConcern?.status === 'pending'
+                                ? application.interviewConcern.message
+                                : '');
+                              setConcernPreferredAt(application.interviewConcern?.status === 'pending'
+                                ? toLocalDateTime(application.interviewConcern.preferredAt)
+                                : '');
+                            }}
+                          >
+                            {application.interviewConcern?.status === 'pending'
+                              ? 'Update conflict request'
+                              : 'Report a scheduling conflict'}
+                          </button>
+                          {concernFormForId === application._id && (
+                            <form
+                              className="candidate-conflict-form"
+                              onSubmit={(event) => {
+                                event.preventDefault();
+                                submitInterviewConcern(application);
+                              }}
+                            >
+                              <label htmlFor={`conflict-message-${application._id}`}>
+                                Tell the recruiter what conflicts
+                                <textarea
+                                  id={`conflict-message-${application._id}`}
+                                  value={concernMessage}
+                                  onChange={(event) => setConcernMessage(event.target.value)}
+                                  maxLength="1000"
+                                  rows="3"
+                                  required
+                                  placeholder="For example, I have another commitment at this time."
+                                />
+                              </label>
+                              <label htmlFor={`conflict-time-${application._id}`}>
+                                Preferred alternative time (optional)
+                                <input
+                                  id={`conflict-time-${application._id}`}
+                                  type="datetime-local"
+                                  min={toLocalDateTime(Date.now() + 60_000)}
+                                  value={concernPreferredAt}
+                                  onChange={(event) => setConcernPreferredAt(event.target.value)}
+                                />
+                              </label>
+                              {actionError && <p className="error" role="alert">{actionError}</p>}
+                              <div className="actions">
+                                <button
+                                  type="submit"
+                                  className="btn small"
+                                  disabled={savingConcernId === application._id}
+                                >
+                                  {savingConcernId === application._id ? 'Sending...' : 'Send to recruiter'}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn ghost small"
+                                  disabled={savingConcernId === application._id}
+                                  onClick={() => {
+                                    setConcernFormForId(null);
+                                    setActionError('');
+                                  }}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </form>
+                          )}
+                        </>
+                      )}
+                    </section>
                   )}
 
                   <div className="candidate-application-progress">

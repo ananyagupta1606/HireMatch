@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api, { errMsg } from '../api.js';
 
@@ -24,8 +24,18 @@ const parseSkills = (value) => {
 
 export default function Dashboard() {
   const [jobs, setJobs] = useState([]);
+  const [recruiterApplications, setRecruiterApplications] = useState([]);
+  const [applicationCounts, setApplicationCounts] = useState({});
+  const [applicationTotal, setApplicationTotal] = useState(0);
+  const [applicationAllCount, setApplicationAllCount] = useState(0);
+  const [applicationPage, setApplicationPage] = useState(1);
+  const [applicationPageSize, setApplicationPageSize] = useState(10);
+  const [applicationTotalPages, setApplicationTotalPages] = useState(0);
   const [loadingJobs, setLoadingJobs] = useState(true);
+  const [loadingApplications, setLoadingApplications] = useState(true);
   const [jobsLoadError, setJobsLoadError] = useState(false);
+  const [applicationsLoadError, setApplicationsLoadError] = useState('');
+  const [applicationsReload, setApplicationsReload] = useState(0);
   const [f, setF] = useState(EMPTY);
   const [skillDraft, setSkillDraft] = useState('');
   const [msg, setMsg] = useState({ type: '', text: '' });
@@ -36,14 +46,14 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [workModeFilter, setWorkModeFilter] = useState('all');
+  const [applicationView, setApplicationView] = useState('all');
+  const [applicationSearch, setApplicationSearch] = useState('');
+  const applicationRequestId = useRef(0);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const skills = parseSkills(f.skills);
   const summary = jobs.reduce((totals, job) => ({
     openRoles: totals.openRoles + (job.status === 'open' ? 1 : 0),
-    applicants: totals.applicants + (job.applicants || 0),
-    shortlisted: totals.shortlisted + (job.stageCounts?.shortlisted || 0),
-    interviews: totals.interviews + (job.stageCounts?.interview || 0),
-  }), { openRoles: 0, applicants: 0, shortlisted: 0, interviews: 0 });
+  }), { openRoles: 0 });
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const visibleJobs = jobs.filter((job) => (
     `${job.title} ${job.location}`.toLowerCase().includes(normalizedQuery)
@@ -51,6 +61,15 @@ export default function Dashboard() {
     && (workModeFilter === 'all' || job.workMode === workModeFilter)
   ));
   const hasActiveFilters = Boolean(normalizedQuery || statusFilter !== 'all' || workModeFilter !== 'all');
+  const applicationViews = [
+    { id: 'all', label: 'All applicants', count: applicationCounts.all || 0 },
+    { id: 'scheduled', label: 'Scheduled interviews', count: applicationCounts.scheduled || 0 },
+    ...APPLICANT_STAGES.map(([stage, label]) => ({
+      id: stage,
+      label,
+      count: applicationCounts[stage] || 0,
+    })),
+  ];
 
   const addSkills = (value) => {
     const additions = parseSkills(value);
@@ -91,6 +110,46 @@ export default function Dashboard() {
     }
   };
   useEffect(() => { load(); }, []);
+  useEffect(() => {
+    let active = true;
+    const requestId = ++applicationRequestId.current;
+    const timeout = window.setTimeout(async () => {
+      setLoadingApplications(true);
+      setApplicationsLoadError('');
+      try {
+        const { data } = await api.get('/applications/recruiter', {
+          params: {
+            page: applicationPage,
+            view: applicationView,
+            search: applicationSearch.trim(),
+          },
+        });
+        if (!active || requestId !== applicationRequestId.current) return;
+        setRecruiterApplications(data.applications);
+        setApplicationCounts(data.counts);
+        setApplicationTotal(data.total);
+        setApplicationAllCount(data.allCount);
+        setApplicationPageSize(data.pageSize);
+        setApplicationTotalPages(data.totalPages);
+        if (applicationPage > data.totalPages) {
+          setApplicationPage(Math.max(1, data.totalPages));
+        }
+      } catch (e) {
+        if (active && requestId === applicationRequestId.current) {
+          setApplicationsLoadError(errMsg(e));
+        }
+      } finally {
+        if (active && requestId === applicationRequestId.current) {
+          setLoadingApplications(false);
+        }
+      }
+    }, applicationSearch.trim() ? 250 : 0);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+    };
+  }, [applicationPage, applicationView, applicationSearch, applicationsReload]);
   useEffect(() => {
     if (!jobToDelete) return undefined;
     const handleKeyDown = (event) => {
@@ -193,26 +252,183 @@ export default function Dashboard() {
             <h1>Your hiring dashboard</h1>
             <p>Manage your openings and keep track of candidates.</p>
           </div>
-          <a className="recruiter-primary-action" href="#job-form">+ Post a job</a>
+          <div className="recruiter-dashboard-actions">
+            <a className="recruiter-open-role-count" href="#job-openings">
+              {loadingJobs && jobs.length === 0 ? '—' : summary.openRoles} Open Roles
+            </a>
+            <a className="recruiter-primary-action" href="#job-form">+ Post a job</a>
+          </div>
         </div>
         {msg.text && !jobToDelete && <p className={msg.type} role={msg.type === 'error' ? 'alert' : 'status'}>{msg.text}</p>}
-        <div className="recruiter-dashboard-stats" role="group" aria-label="Hiring overview">
-          {[
-            ['Open roles', summary.openRoles],
-            ['Applicants', summary.applicants],
-            ['Shortlisted', summary.shortlisted],
-            ['In interviews', summary.interviews],
-          ].map(([label, value]) => (
-            <div className="recruiter-stat-card" key={label}>
-              <span>{label}</span>
-              <strong>{loadingJobs && jobs.length === 0 ? '—' : value}</strong>
-            </div>
+      </section>
+
+      <section className="recruiter-applications-dashboard" aria-labelledby="recruiter-applications-title">
+        <div className="recruiter-list-heading">
+          <div>
+            <h2 id="recruiter-applications-title">Applicants</h2>
+            <p>Review candidates by application status and keep upcoming interviews in view.</p>
+          </div>
+        </div>
+        <div className="recruiter-application-tabs" role="group" aria-label="Filter applicants by status">
+          {applicationViews.map((view) => (
+            <button
+              type="button"
+              aria-pressed={applicationView === view.id}
+              className={applicationView === view.id ? 'is-active' : ''}
+              key={view.id}
+              onClick={() => {
+                setApplicationPage(1);
+                setApplicationView(view.id);
+              }}
+            >
+              {view.label} <span>{loadingApplications ? '—' : view.count}</span>
+            </button>
           ))}
         </div>
+        <div className="recruiter-application-search">
+          <label className="recruiter-application-search-field">
+            <span className="sr-only">Search candidates or roles</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m21 21-4.35-4.35m1.35-5.15a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Z" />
+            </svg>
+            <input
+              type="search"
+              value={applicationSearch}
+              maxLength={100}
+              onChange={(event) => {
+                setApplicationPage(1);
+                setApplicationSearch(event.target.value);
+              }}
+              placeholder="Search name, email, or job"
+            />
+          </label>
+        </div>
+        {loadingApplications ? (
+          <div className="recruiter-state-card" role="status">
+            <span className="recruiter-state-spinner" aria-hidden="true" />
+            <span>Loading applicants...</span>
+          </div>
+        ) : applicationsLoadError ? (
+          <div className="recruiter-state-card recruiter-state-card--error">
+            <strong>We couldn’t load your applicants.</strong>
+            <p>{applicationsLoadError}</p>
+            <button
+              type="button"
+              className="btn ghost small"
+              onClick={() => setApplicationsReload((current) => current + 1)}
+            >
+              Try again
+            </button>
+          </div>
+        ) : recruiterApplications.length === 0 ? (
+          <div className="recruiter-state-card recruiter-state-card--empty">
+            <strong>
+              {applicationAllCount === 0
+                ? 'No applicants yet'
+                : 'No applicants match these filters'}
+            </strong>
+            <p>
+              {applicationAllCount === 0
+                ? 'Applications from all your job openings will appear here.'
+                : 'Try a different status or search term.'}
+            </p>
+            {(applicationView !== 'all' || applicationSearch.trim()) && (
+              <button
+                type="button"
+                className="recruiter-clear-filters"
+                onClick={() => {
+                  setApplicationPage(1);
+                  setApplicationView('all');
+                  setApplicationSearch('');
+                }}
+              >
+                Clear applicant filters
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="recruiter-application-list">
+            {recruiterApplications.map((application) => (
+              <article className="recruiter-application-card" key={application._id}>
+                <div className="recruiter-application-main">
+                  <strong>{application.candidate.name}</strong>
+                  <span>{application.candidate.email}</span>
+                  <p>
+                    {application.job.title} · {
+                      application.candidateProfile?.headline
+                      || application.candidateProfile?.skills?.slice(0, 3).join(', ')
+                      || (application.candidateProfile
+                        ? `${application.candidateProfile.experienceYears ?? 0} years experience`
+                        : 'Profile incomplete')
+                    }
+                  </p>
+                  <div className="recruiter-application-meta">
+                    <span className={`recruiter-application-stage recruiter-application-stage--${application.stage}`}>
+                      {application.stage}
+                    </span>
+                    {application.stage === 'interview' && application.interviewAt && (
+                      <span>
+                        {new Date(application.interviewAt).toLocaleString()} · {application.interviewDurationMinutes || 60} min
+                      </span>
+                    )}
+                    {application.interviewConcern?.status === 'pending' && (
+                      <span className="recruiter-application-concern">Interview concern to review</span>
+                    )}
+                  </div>
+                </div>
+                {application.stage === 'interview' && application.interviewAt && application.interviewDetails?.meetingLink && (
+                  <a
+                    className="recruiter-application-meeting-link"
+                    href={application.interviewDetails.meetingLink}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Join meeting
+                  </a>
+                )}
+                <Link
+                  className="recruiter-application-manage"
+                  to={`/dashboard/jobs/${application.job._id}/applicants/${application._id}`}
+                >
+                  Manage applicant <span aria-hidden="true">→</span>
+                </Link>
+              </article>
+            ))}
+          </div>
+        )}
+        {!loadingApplications && !applicationsLoadError && applicationTotal > 0 && (
+          <div className="recruiter-application-pagination">
+            <span>
+              Showing {(applicationPage - 1) * applicationPageSize + 1}–
+              {Math.min(applicationPage * applicationPageSize, applicationTotal)} of {applicationTotal}
+            </span>
+            {applicationTotalPages > 1 && (
+              <div className="recruiter-application-pagination-actions">
+                <button
+                  type="button"
+                  className="recruiter-application-page-button"
+                  disabled={loadingApplications || applicationPage <= 1}
+                  onClick={() => setApplicationPage((page) => page - 1)}
+                >
+                  Previous
+                </button>
+                <span>Page {applicationPage} of {applicationTotalPages}</span>
+                <button
+                  type="button"
+                  className="recruiter-application-page-button"
+                  disabled={loadingApplications || applicationPage >= applicationTotalPages}
+                  onClick={() => setApplicationPage((page) => page + 1)}
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
       <div className="two-col">
-        <section className="recruiter-job-list-section">
+        <section className="recruiter-job-list-section" id="job-openings">
           <div className="recruiter-list-heading">
             <div>
               <h2>Job openings</h2>

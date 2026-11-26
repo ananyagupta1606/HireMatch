@@ -5,12 +5,59 @@ const Notification = require("../models/Notification");
 const RecruiterNote = require("../models/RecruiterNote");
 const Job = require("../models/Job");
 const Profile = require("../models/CandidateProfile");
+const User = require("../models/User");
 
 const wrap = require("../utils/wrap");
 const { protect, allow } = require("../middleware/auth");
 const { TRANSITIONS } = require("../utils/stages");
 const { pipeline } = require("stream/promises");
 const cloudinary = require("../services/cloudinary");
+const INTERVIEW_DURATIONS = [15, 30, 45, 60, 90, 120];
+const RECRUITER_APPLICATION_PAGE_SIZE = 10;
+const APPLICATION_STAGES = [
+	"applied",
+	"shortlisted",
+	"interview",
+	"offered",
+	"rejected",
+	"withdrawn",
+];
+
+const normalizeInterviewDetails = (details, defaultMode = "online") => {
+	if (!details || typeof details !== "object" || Array.isArray(details)) {
+		return null;
+	}
+
+	const mode = details.mode ?? defaultMode;
+	if (!["online", "offline"].includes(mode)) {
+		return null;
+	}
+
+	const normalized = {};
+	for (const [field, maxLength] of [
+		["location", 300],
+		["meetingLink", 500],
+		["instructions", 2000],
+	]) {
+		const value = details[field] ?? "";
+		if (typeof value !== "string" || value.length > maxLength) {
+			return null;
+		}
+		normalized[field] = value.trim();
+	}
+	normalized.mode = mode;
+
+	if (normalized.meetingLink) {
+		try {
+			const url = new URL(normalized.meetingLink);
+			if (!["http:", "https:"].includes(url.protocol)) return null;
+		} catch {
+			return null;
+		}
+	}
+
+	return normalized;
+};
 
 // POST /api/applications
 // Candidates can apply only if they meet the job's experience requirement.
@@ -68,7 +115,11 @@ router.post(
 					stage: "applied",
 					coverNote: applicationCoverNote,
 				},
-				$unset: { interviewAt: 1 },
+				$unset: {
+					interviewAt: 1,
+					interviewDetails: 1,
+					interviewConcern: 1,
+				},
 				$push: {
 					stageHistory: { stage: "applied", at: new Date() },
 				},
@@ -135,6 +186,162 @@ router.get(
 	}),
 );
 
+// GET /api/applications/recruiter
+// Return applications across the logged-in recruiter's jobs.
+router.get(
+	"/recruiter",
+	protect,
+	allow("recruiter"),
+	wrap(async (req, res) => {
+		const jobs = await Job.find({ recruiter: req.user._id }).select("_id").lean();
+		const jobIds = jobs.map((job) => job._id);
+		const requestedPage = req.query.page === undefined ? 1 : Number(req.query.page);
+		if (!Number.isSafeInteger(requestedPage) || requestedPage < 1) {
+			return res.status(400).json({ message: "Page must be a positive integer." });
+		}
+		const page = requestedPage;
+		const requestedView = req.query.view === undefined ? "all" : req.query.view;
+		if (
+			typeof requestedView !== "string"
+			|| !["all", "scheduled", ...APPLICATION_STAGES].includes(requestedView)
+		) {
+			return res.status(400).json({ message: "Invalid application view." });
+		}
+		const view = requestedView;
+		const requestedSearch = req.query.search === undefined ? "" : req.query.search;
+		if (typeof requestedSearch !== "string" || requestedSearch.length > 100) {
+			return res.status(400).json({ message: "Search must be 100 characters or fewer." });
+		}
+		const search = requestedSearch.trim();
+		const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+		const viewMatch = view === "scheduled"
+			? { stage: "interview", interviewAt: { $exists: true, $ne: null } }
+			: view === "all" ? null : { stage: view };
+		const viewPipeline = viewMatch ? [{ $match: viewMatch }] : [];
+
+		if (jobIds.length === 0) {
+			return res.json({
+				applications: [],
+				counts: { all: 0, scheduled: 0, ...Object.fromEntries(APPLICATION_STAGES.map((stage) => [stage, 0])) },
+				total: 0,
+				allCount: 0,
+				page,
+				pageSize: RECRUITER_APPLICATION_PAGE_SIZE,
+				totalPages: 0,
+			});
+		}
+
+		const basePipeline = [
+			{ $match: { job: { $in: jobIds } } },
+			{
+				$lookup: {
+					from: User.collection.name,
+					localField: "candidate",
+					foreignField: "_id",
+					as: "candidate",
+				},
+			},
+			{ $unwind: "$candidate" },
+			{
+				$lookup: {
+					from: Job.collection.name,
+					localField: "job",
+					foreignField: "_id",
+					as: "job",
+				},
+			},
+			{ $unwind: "$job" },
+			{
+				$set: {
+					candidate: {
+						_id: "$candidate._id",
+						name: "$candidate.name",
+						email: "$candidate.email",
+					},
+					job: {
+						_id: "$job._id",
+						title: "$job.title",
+						location: "$job.location",
+					},
+				},
+			},
+		];
+
+		if (escapedSearch) {
+			basePipeline.push({
+				$match: {
+					$or: [
+						{ "candidate.name": { $regex: escapedSearch, $options: "i" } },
+						{ "candidate.email": { $regex: escapedSearch, $options: "i" } },
+						{ "job.title": { $regex: escapedSearch, $options: "i" } },
+					],
+				},
+			});
+		}
+
+		const [result, allCount] = await Promise.all([
+			Application.aggregate([
+				...basePipeline,
+				{
+					$facet: {
+						applications: [
+							...viewPipeline,
+							{
+								$sort: view === "scheduled"
+									? { interviewAt: 1, _id: 1 }
+									: { createdAt: -1, _id: -1 },
+							},
+							{ $skip: (page - 1) * RECRUITER_APPLICATION_PAGE_SIZE },
+							{ $limit: RECRUITER_APPLICATION_PAGE_SIZE },
+						],
+						total: [...viewPipeline, { $count: "value" }],
+						stageCounts: [
+							{ $group: { _id: "$stage", count: { $sum: 1 } } },
+						],
+						scheduledCount: [
+							{ $match: { stage: "interview", interviewAt: { $exists: true, $ne: null } } },
+							{ $count: "value" },
+						],
+					},
+				},
+			]),
+			Application.countDocuments({ job: { $in: jobIds } }),
+		]);
+
+		const aggregated = result[0];
+		const counts = Object.fromEntries(APPLICATION_STAGES.map((stage) => [stage, 0]));
+		for (const { _id, count } of aggregated.stageCounts) {
+			if (APPLICATION_STAGES.includes(_id)) counts[_id] = count;
+		}
+		counts.all = Object.values(counts).reduce((sum, count) => sum + count, 0);
+		counts.scheduled = aggregated.scheduledCount[0]?.value || 0;
+
+		const profiles = await Profile.find({
+			userId: { $in: aggregated.applications.map((application) => application.candidate._id) },
+		})
+			.select("userId headline experienceYears skills")
+			.lean();
+		const profileByCandidate = Object.fromEntries(
+			profiles.map((profile) => [String(profile.userId), profile]),
+		);
+		const applications = aggregated.applications.map((application) => ({
+			...application,
+			candidateProfile: profileByCandidate[String(application.candidate._id)] || null,
+		}));
+		const total = aggregated.total[0]?.value || 0;
+
+		res.json({
+			applications,
+			counts,
+			total,
+			allCount,
+			page,
+			pageSize: RECRUITER_APPLICATION_PAGE_SIZE,
+			totalPages: Math.ceil(total / RECRUITER_APPLICATION_PAGE_SIZE),
+		});
+	}),
+);
+
 // PATCH /api/applications/:id/withdraw
 // Candidates can withdraw applications that are still in progress.
 router.patch(
@@ -167,7 +374,10 @@ router.patch(
 			},
 			{
 				$set: { stage: "withdrawn" },
-				$unset: { interviewAt: 1 },
+				$unset: {
+					interviewAt: 1,
+					interviewDetails: 1,
+				},
 				$push: {
 					stageHistory: { stage: "withdrawn", at: new Date() },
 				},
@@ -193,6 +403,7 @@ router.patch(
 			_id: withdrawnApplication._id,
 			stage: withdrawnApplication.stage,
 			interviewAt: withdrawnApplication.interviewAt || null,
+			interviewDetails: withdrawnApplication.interviewDetails || null,
 		});
 	}),
 );
@@ -352,30 +563,190 @@ router.patch(
 			}
 		}
 
+		const previousDetails = {
+			mode:
+				app.interviewDetails?.mode ||
+				(app.interviewDetails?.meetingLink
+					? "online"
+					: app.interviewDetails?.location
+						? "offline"
+						: "online"),
+			location: app.interviewDetails?.location || "",
+			meetingLink: app.interviewDetails?.meetingLink || "",
+			instructions: app.interviewDetails?.instructions || "",
+		};
+		let nextDetails = previousDetails;
+		if (Object.hasOwn(req.body, "interviewDetails")) {
+			nextDetails = normalizeInterviewDetails(
+				req.body.interviewDetails,
+				previousDetails.mode,
+			);
+			if (!nextDetails) {
+				return res.status(400).json({
+					message: "Interview details are invalid or exceed their character limits.",
+				});
+			}
+		}
+
+		const nextDuration = Object.hasOwn(req.body, "interviewDurationMinutes")
+			? req.body.interviewDurationMinutes
+			: app.interviewDurationMinutes || 60;
+		if (!INTERVIEW_DURATIONS.includes(nextDuration)) {
+			return res.status(400).json({
+				message: "Choose a valid interview duration.",
+			});
+		}
+
 		const nextTime = nextInterviewAt?.getTime() ?? null;
-		if (previousTime === nextTime) {
-			return res.json({ interviewAt: app.interviewAt || null });
+		const detailsChanged =
+			JSON.stringify(previousDetails) !== JSON.stringify(nextDetails);
+		const durationChanged =
+			(app.interviewDurationMinutes || 60) !== nextDuration;
+		if (
+			previousTime === nextTime &&
+			(!nextInterviewAt || (!detailsChanged && !durationChanged))
+		) {
+			return res.json({
+				interviewAt: app.interviewAt || null,
+				interviewDurationMinutes: app.interviewDurationMinutes || 60,
+				interviewDetails: app.interviewDetails || null,
+			});
 		}
 
 		app.interviewAt = nextInterviewAt || undefined;
+		if (nextInterviewAt) {
+			app.interviewDetails = nextDetails;
+			app.interviewDurationMinutes = nextDuration;
+		} else {
+			app.interviewDetails = undefined;
+		}
 		await app.save();
 
-		const action = nextInterviewAt
-			? previousTime
-				? "rescheduled"
-				: "scheduled"
-			: "cancelled";
+		const action = !nextInterviewAt
+			? "cancelled"
+			: !previousTime
+				? "scheduled"
+				: previousTime !== nextTime
+					? "rescheduled"
+					: "updated";
 		await Notification.create({
 			recipient: app.candidate,
 			type: "interview_scheduled",
 			title: `Interview ${action}`,
 			message: nextInterviewAt
-				? `Your interview for ${app.job.title} was ${action}. View the updated time in My Applications.`
+				? `Your interview for ${app.job.title} was ${action}. View the details in My Applications.`
 				: `Your interview for ${app.job.title} was cancelled.`,
 			link: "/applications",
 		});
 
-		res.json({ interviewAt: app.interviewAt || null });
+		res.json({
+			interviewAt: app.interviewAt || null,
+			interviewDurationMinutes: app.interviewDurationMinutes || 60,
+			interviewDetails: app.interviewDetails || null,
+		});
+	}),
+);
+
+// Candidates can report a scheduling conflict for their own scheduled interview.
+router.post(
+	"/:id/interview-concern",
+	protect,
+	allow("candidate"),
+	wrap(async (req, res) => {
+		const app = await Application.findOne({
+			_id: req.params.id,
+			candidate: req.user._id,
+		}).populate("job", "recruiter title");
+
+		if (!app || !app.job) {
+			return res.status(404).json({ message: "Application not found" });
+		}
+		if (app.stage !== "interview" || !app.interviewAt) {
+			return res.status(400).json({
+				message: "A conflict can only be reported for a scheduled interview.",
+			});
+		}
+
+		const message =
+			typeof req.body?.message === "string" ? req.body.message.trim() : "";
+		if (!message || message.length > 1000) {
+			return res.status(400).json({
+				message: "Please describe the conflict in 1,000 characters or fewer.",
+			});
+		}
+
+		let preferredAt;
+		if (req.body?.preferredAt) {
+			if (typeof req.body.preferredAt !== "string") {
+				return res.status(400).json({
+					message: "The preferred time must be valid.",
+				});
+			}
+			preferredAt = new Date(req.body.preferredAt);
+			if (
+				Number.isNaN(preferredAt.getTime()) ||
+				preferredAt.getTime() <= Date.now()
+			) {
+				return res.status(400).json({
+					message: "Choose a preferred time in the future.",
+				});
+			}
+		}
+
+		app.interviewConcern = {
+			message,
+			preferredAt,
+			status: "pending",
+			createdAt: new Date(),
+			resolvedAt: undefined,
+		};
+		await app.save();
+
+		await Notification.create({
+			recipient: app.job.recruiter,
+			type: "interview_concern",
+			title: "Candidate reported an interview conflict",
+			message: `${req.user.name} reported a scheduling conflict for ${app.job.title}.`,
+			link: `/dashboard/jobs/${app.job._id}`,
+		});
+
+		res.status(201).json({ interviewConcern: app.interviewConcern });
+	}),
+);
+
+// Recruiters can mark a candidate's interview concern as addressed.
+router.patch(
+	"/:id/interview-concern/resolve",
+	protect,
+	allow("recruiter"),
+	wrap(async (req, res) => {
+		const app = await Application.findById(req.params.id).populate(
+			"job",
+			"recruiter title",
+		);
+
+		if (!app || !app.job || !app.job.recruiter.equals(req.user._id)) {
+			return res.status(404).json({ message: "Application not found" });
+		}
+		if (!app.interviewConcern || app.interviewConcern.status !== "pending") {
+			return res.status(400).json({
+				message: "There is no pending interview concern to resolve.",
+			});
+		}
+
+		app.interviewConcern.status = "resolved";
+		app.interviewConcern.resolvedAt = new Date();
+		await app.save();
+
+		await Notification.create({
+			recipient: app.candidate,
+			type: "interview_concern",
+			title: "Interview concern reviewed",
+			message: `The recruiter reviewed your interview concern for ${app.job.title}.`,
+			link: "/applications",
+		});
+
+		res.json({ interviewConcern: app.interviewConcern });
 	}),
 );
 
@@ -411,6 +782,7 @@ router.patch(
 		app.stage = stage;
 		if (stage !== "interview") {
 			app.interviewAt = undefined;
+			app.interviewDetails = undefined;
 		}
 		app.stageHistory.push({ stage });
 

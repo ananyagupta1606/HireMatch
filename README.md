@@ -14,7 +14,8 @@ HireMatch is a MERN-based job portal connecting candidates and recruiters. Its k
 - **In-app notifications:** Get bell alerts for jobs matching your profile skills, new applications, and application-stage updates. No email notifications are sent.
 - **Recruiter Dashboard:** View and rank applicants by skill-match score.
 - **Recruiter Account Settings:** Update recruiter details or delete the account. Deleting closes open jobs while preserving job and application history.
-- **Applicant management:** Filter/search and sort candidates, track stage totals, and schedule interviews with in-app candidate notifications.
+- **Applicant management:** Filter/search and sort candidates, track stage totals, and add private recruiter notes.
+- **Interview coordination:** Recruiters can schedule or update online or in-person interviews with duration, a meeting link or address, and instructions. Candidates see the details in My Applications, can download a calendar event with a 30-minute reminder, and can report scheduling conflicts with an optional preferred time. Recruiters can mark concerns as addressed.
 - **Stage Management:** Server-side validation of application stage transitions.
 
 ##  Tech Stack
@@ -100,6 +101,8 @@ Run the seed script before using these accounts.
 | GET | `/api/applications/me` | Candidate |
 | PATCH | `/api/applications/:id/stage` | Job owner |
 | PATCH | `/api/applications/:id/interview` | Job owner |
+| POST | `/api/applications/:id/interview-concern` | Candidate (own scheduled interview) |
+| PATCH | `/api/applications/:id/interview-concern/resolve` | Job owner |
 | GET | `/api/notifications` | Authenticated user |
 | PATCH | `/api/notifications/:id/read` | Notification owner |
 | PATCH | `/api/notifications/read-all` | Authenticated user |
