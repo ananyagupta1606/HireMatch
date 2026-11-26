@@ -142,6 +142,75 @@ hr {
 	font-weight: 650;
 }
 
+.user-menu {
+	position: relative;
+}
+
+.user-menu-trigger {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
+	max-width: min(260px, 42vw);
+	padding: 0.45rem 0.6rem;
+	overflow: hidden;
+	border: 0;
+	border-radius: 7px;
+	background: transparent;
+	color: #c9d6d2;
+	font: inherit;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.user-menu-trigger:hover,
+.user-menu:focus-within .user-menu-trigger {
+	background: rgba(255, 255, 255, 0.1);
+	color: #fff;
+}
+
+.user-menu-dropdown {
+	position: absolute;
+	z-index: 10;
+	top: 100%;
+	right: 0;
+	display: none;
+	min-width: 160px;
+	padding: 0.35rem;
+	border: 1px solid var(--line);
+	border-radius: 9px;
+	background: #fff;
+	box-shadow: 0 12px 28px rgba(18, 32, 43, 0.2);
+}
+
+.user-menu:hover .user-menu-dropdown,
+.user-menu:focus-within .user-menu-dropdown {
+	display: grid;
+}
+
+.nav .user-menu-dropdown a,
+.user-menu-dropdown button {
+	display: block;
+	width: 100%;
+	padding: 0.6rem 0.7rem;
+	border: 0;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--ink);
+	font: inherit;
+	font-size: 0.88rem;
+	text-align: left;
+	text-decoration: none;
+	cursor: pointer;
+}
+
+.nav .user-menu-dropdown a:hover,
+.nav .user-menu-dropdown a.active,
+.user-menu-dropdown button:hover {
+	background: #f0f8f5;
+	color: var(--brand-dark);
+}
+
 .notification-area {
 	position: relative;
 }
@@ -560,18 +629,57 @@ textarea:disabled {
 
 .recruiter-dashboard-overview {
 	margin-top: 0.65rem;
+	padding: 1.4rem;
+	border-radius: 18px;
+	background: linear-gradient(125deg, #123b36, #0d7c66);
+	color: #fff;
+	box-shadow: 0 14px 34px rgba(13, 92, 76, 0.16);
+}
+
+.recruiter-dashboard-heading {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+}
+
+.recruiter-dashboard-heading .recruiter-form-eyebrow {
+	color: #a8e3d1;
 }
 
 .recruiter-dashboard-heading h1 {
 	margin: 0.2rem 0 0.25rem;
 	font-size: clamp(1.55rem, 3vw, 1.9rem);
 	letter-spacing: -0.035em;
+	color: #fff;
 }
 
 .recruiter-dashboard-heading p {
 	margin: 0;
-	color: var(--muted);
+	color: #d3e8e1;
 	font-size: 0.9rem;
+}
+
+.recruiter-primary-action {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 42px;
+	flex: 0 0 auto;
+	padding: 0.55rem 0.9rem;
+	border: 1px solid rgba(255, 255, 255, 0.65);
+	border-radius: 9px;
+	background: #fff;
+	color: var(--brand-dark);
+	font-size: 0.84rem;
+	font-weight: 750;
+	text-decoration: none;
+	transition: background 0.18s, transform 0.18s;
+}
+
+.recruiter-primary-action:hover {
+	background: #e8f7f1;
+	transform: translateY(-1px);
 }
 
 .recruiter-dashboard-stats {
@@ -589,7 +697,7 @@ textarea:disabled {
 	border: 1px solid var(--line);
 	border-radius: 12px;
 	background: #fff;
-	box-shadow: var(--shadow);
+	box-shadow: 0 5px 16px rgba(8, 41, 34, 0.1);
 }
 
 .recruiter-stat-card span {
@@ -602,6 +710,20 @@ textarea:disabled {
 	color: var(--ink);
 	font-size: 1.4rem;
 	line-height: 1.1;
+}
+
+.recruiter-dashboard-overview .error,
+.recruiter-dashboard-overview .ok {
+	margin: 0.9rem 0 0;
+	padding: 0.55rem 0.75rem;
+	border-radius: 8px;
+	background: rgba(255, 255, 255, 0.95);
+	font-size: 0.84rem;
+}
+
+.recruiter-dashboard > .two-col {
+	grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.85fr);
+	gap: 1.25rem;
 }
 
 .recruiter-job-list-section {
@@ -778,6 +900,13 @@ textarea:disabled {
 	text-transform: capitalize;
 }
 
+.recruiter-job-compensation {
+	margin: 0.25rem 0 0;
+	color: #52635e;
+	font-size: 0.78rem;
+	font-weight: 650;
+}
+
 .recruiter-job-stage-counts {
 	display: flex;
 	flex-wrap: wrap;
@@ -804,10 +933,13 @@ textarea:disabled {
 
 .recruiter-applicants-link {
 	display: inline-flex;
+	flex-direction: column;
 	align-items: center;
-	gap: 0.45rem;
-	min-height: 40px;
-	padding: 0.4rem 0.75rem;
+	justify-content: center;
+	gap: 0.05rem;
+	min-width: 132px;
+	min-height: 58px;
+	padding: 0.4rem 0.7rem;
 	border: 1px solid var(--line);
 	border-radius: 9px;
 	background: #f8faf9;
@@ -820,7 +952,13 @@ textarea:disabled {
 
 .recruiter-applicants-link strong {
 	color: var(--brand);
-	font-size: 0.95rem;
+	font-size: 1.15rem;
+	line-height: 1.1;
+}
+
+.recruiter-applicants-link span {
+	font-size: 0.72rem;
+	font-weight: 700;
 }
 
 .recruiter-applicants-link:hover {
@@ -1307,6 +1445,88 @@ textarea:disabled {
 	box-shadow: var(--shadow);
 }
 
+.account-page {
+	max-width: 760px;
+}
+
+.account-section .section-heading {
+	margin-bottom: 24px;
+}
+
+.account-delete {
+	margin-top: 24px;
+	border-color: #f0c9c6;
+}
+
+.account-password-fields {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	column-gap: 20px;
+	margin-top: 18px;
+	padding-top: 22px;
+	border-top: 1px solid #edf1ef;
+}
+
+.account-password-toggle {
+	margin-top: 2px;
+	padding: 0.3rem 0;
+	border: 0;
+	background: transparent;
+	color: var(--brand);
+	font: inherit;
+	font-size: 0.9rem;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+.account-password-toggle:hover:not(:disabled) {
+	color: var(--brand-dark);
+	text-decoration: underline;
+}
+
+.account-password-toggle:disabled {
+	cursor: not-allowed;
+	opacity: 0.6;
+}
+
+.account-password-fields .profile-label:first-child {
+	grid-column: 1 / -1;
+}
+
+.account-delete .section-heading {
+	margin-bottom: 16px;
+}
+
+.account-warning {
+	padding: 14px 16px;
+	border: 1px solid #f2cdcd;
+	border-radius: 9px;
+	background: #fff7f6;
+	color: #6d3330;
+	font-size: 13px;
+}
+
+.account-warning ul {
+	margin: 8px 0 0;
+	padding-left: 20px;
+	line-height: 1.7;
+}
+
+.account-delete-form {
+	margin-top: 20px;
+}
+
+.account-delete-form .btn.danger {
+	min-height: 42px;
+	padding: 0.55rem 1rem;
+	background: #fff;
+	font-weight: 700;
+}
+
+.account-delete-form .btn.danger:hover:not(:disabled) {
+	background: #fff0ef;
+}
+
 .profile-section + .profile-section {
 	margin-top: 30px;
 	padding-top: 28px;
@@ -1779,6 +1999,10 @@ textarea:disabled {
 		grid-template-columns: 1fr;
 	}
 
+	.recruiter-dashboard > .two-col {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
 	.recruiter-dashboard-stats {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
@@ -1821,6 +2045,19 @@ textarea:disabled {
 }
 
 @media (max-width: 600px) {
+	.recruiter-dashboard-overview {
+		padding: 1.1rem;
+	}
+
+	.recruiter-dashboard-heading {
+		align-items: stretch;
+		flex-direction: column;
+	}
+
+	.recruiter-primary-action {
+		align-self: flex-start;
+	}
+
 	.profile-page {
 		width: calc(100% - 24px);
 		margin: 26px auto 40px;
@@ -1854,6 +2091,14 @@ textarea:disabled {
 	.profile-grid {
 		grid-template-columns: 1fr;
 		gap: 0;
+	}
+
+	.account-password-fields {
+		grid-template-columns: 1fr;
+	}
+
+	.account-password-fields .profile-label:first-child {
+		grid-column: auto;
 	}
 
 	.section-heading h2 {

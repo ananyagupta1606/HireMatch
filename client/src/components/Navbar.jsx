@@ -34,15 +34,40 @@ export default function Navbar() {
 					{user ? (
 						<>
 							<Notifications />
-							<button
-								className="link"
-								onClick={() => {
-									logout();
-									nav("/");
-								}}
-							>
-								Log out ({user.name.split(" ")[0]})
-							</button>
+							{user.role === "recruiter" ? (
+								<div className="user-menu">
+									<button
+										className="user-menu-trigger"
+										type="button"
+										aria-haspopup="true"
+									>
+										{user.name}
+										<span aria-hidden="true">▾</span>
+									</button>
+									<div className="user-menu-dropdown">
+										<NavLink to="/account">My Account</NavLink>
+										<button
+											type="button"
+											onClick={() => {
+												logout();
+												nav("/");
+											}}
+										>
+											Log out
+										</button>
+									</div>
+								</div>
+							) : (
+								<button
+									className="link"
+									onClick={() => {
+										logout();
+										nav("/");
+									}}
+								>
+									Log out ({user.name.split(" ")[0]})
+								</button>
+							)}
 						</>
 					) : (
 						/* Guest navigation */

@@ -8,6 +8,7 @@ import Profile from "./pages/Profile.jsx";
 import MyApplications from "./pages/MyApplications.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Applicants from "./pages/Applicants.jsx";
+import Account from "./pages/Account.jsx";
 
 // Route guard: checks login status and user role
 function Guard({ role, children }) {
@@ -88,6 +89,14 @@ export default function App() {
 						element={
 							<Guard role="recruiter">
 								<Applicants />
+							</Guard>
+						}
+					/>
+					<Route
+						path="/account"
+						element={
+							<Guard role="recruiter">
+								<Account />
 							</Guard>
 						}
 					/>

@@ -45,7 +45,7 @@ export default function Dashboard() {
   }), { openRoles: 0, applicants: 0, shortlisted: 0, interviews: 0 });
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const visibleJobs = jobs.filter((job) => (
-    job.title.toLowerCase().includes(normalizedQuery)
+    `${job.title} ${job.location}`.toLowerCase().includes(normalizedQuery)
     && (statusFilter === 'all' || job.status === statusFilter)
     && (workModeFilter === 'all' || job.workMode === workModeFilter)
   ));
@@ -192,6 +192,7 @@ export default function Dashboard() {
             <h1>Your hiring dashboard</h1>
             <p>Manage your openings and keep track of candidates.</p>
           </div>
+          <a className="recruiter-primary-action" href="#job-form">+ Post a job</a>
         </div>
         {msg.text && !jobToDelete && <p className={msg.type} role={msg.type === 'error' ? 'alert' : 'status'}>{msg.text}</p>}
         <div className="recruiter-dashboard-stats" role="group" aria-label="Hiring overview">
@@ -214,12 +215,16 @@ export default function Dashboard() {
           <div className="recruiter-list-heading">
             <div>
               <h2>Job openings</h2>
-              <p>{jobs.length} posting{jobs.length === 1 ? '' : 's'} · newest first</p>
+              <p>
+                {hasActiveFilters
+                  ? `Showing ${visibleJobs.length} of ${jobs.length} posting${jobs.length === 1 ? '' : 's'}`
+                  : `${jobs.length} posting${jobs.length === 1 ? '' : 's'} · newest first`}
+              </p>
             </div>
           </div>
           <div className="recruiter-job-filters">
-            <label>Search jobs
-              <input type="search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search by job title" />
+            <label>Search roles
+              <input type="search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search title or location" />
             </label>
             <label>Status
               <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
@@ -289,6 +294,9 @@ export default function Dashboard() {
                     <span className={`recruiter-job-status recruiter-job-status--${j.status === 'open' ? 'open' : 'closed'}`}>{j.status}</span>
                   </div>
                   <p className="recruiter-job-meta">{j.location} · {j.workMode}</p>
+                  <p className="recruiter-job-compensation">
+                    {j.minExp}+ yrs experience <span aria-hidden="true">·</span> {j.ctcMin}–{j.ctcMax} LPA
+                  </p>
                   <div className="recruiter-job-stage-counts" aria-label="Applicant counts by stage">
                     {APPLICANT_STAGES.map(([stage, label]) => (
                       <span key={stage}>{label}: <strong>{j.stageCounts?.[stage] ?? 0}</strong></span>
@@ -296,9 +304,13 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="recruiter-job-actions">
-                  <Link className="recruiter-applicants-link" to={`/dashboard/jobs/${j._id}`}>
-                    <strong>{j.applicants}</strong>
-                    <span>Applicant{j.applicants === 1 ? '' : 's'}</span>
+                  <Link
+                    className="recruiter-applicants-link"
+                    to={`/dashboard/jobs/${j._id}`}
+                    aria-label={`View ${j.applicants} applicant${j.applicants === 1 ? '' : 's'} for ${j.title}`}
+                  >
+                    <strong>{j.applicants ?? 0}</strong>
+                    <span>View applicants <span aria-hidden="true">→</span></span>
                   </Link>
                   <div className="recruiter-action-group" aria-label={`Manage ${j.title}`}>
                     <button className="recruiter-action recruiter-action--edit" disabled={busyJobId === j._id} onClick={() => edit(j)}>Edit</button>
@@ -324,7 +336,7 @@ export default function Dashboard() {
           )}
         </section>
 
-        <form className="card recruiter-job-form" onSubmit={saveJob}>
+        <form id="job-form" className="card recruiter-job-form" onSubmit={saveJob}>
           <div className="recruiter-form-heading">
             <div>
               <span className="recruiter-form-eyebrow">{editingJobId ? 'JOB DETAILS' : 'HIRING'}</span>

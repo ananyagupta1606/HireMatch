@@ -4,6 +4,9 @@ const jwt = require("jsonwebtoken");
 const { OAuth2Client } = require("google-auth-library");
 
 const User = require("../models/User");
+const Job = require("../models/Job");
+const Notification = require("../models/Notification");
+const RecruiterNote = require("../models/RecruiterNote");
 const wrap = require("../utils/wrap");
 const { protect } = require("../middleware/auth");
 
@@ -195,6 +198,177 @@ router.post(
 // Get the currently authenticated user
 router.get("/me", protect, (req, res) =>
 	res.json({ user: pub(req.user) }),
+);
+
+// Update the authenticated recruiter's account details.
+router.put(
+	"/me",
+	protect,
+	wrap(async (req, res) => {
+		if (req.user.role !== "recruiter") {
+			return res.status(403).json({
+				message: "Only recruiters can update account details here",
+			});
+		}
+
+		const body =
+			req.body && typeof req.body === "object" ? req.body : {};
+		const updates = {};
+		for (const [field, maxLength] of [
+			["name", 100],
+			["email", 254],
+			["company", 120],
+		]) {
+			if (body[field] === undefined) continue;
+			if (
+				typeof body[field] !== "string" ||
+				!body[field].trim() ||
+				body[field].trim().length > maxLength
+			) {
+				return res.status(400).json({
+					message: `${field[0].toUpperCase()}${field.slice(1)} is required and must be no longer than ${maxLength} characters`,
+				});
+			}
+			updates[field] =
+				field === "email"
+					? body[field].trim().toLowerCase()
+					: body[field].trim();
+		}
+
+		if (
+			updates.email &&
+			!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(updates.email)
+		) {
+			return res.status(400).json({
+				message: "Enter a valid email address",
+			});
+		}
+
+		if (
+			updates.email &&
+			updates.email !== req.user.email &&
+			(await User.exists({
+				email: updates.email,
+				_id: { $ne: req.user._id },
+			}))
+		) {
+			return res.status(409).json({
+				message: "Email already registered",
+			});
+		}
+
+		Object.assign(req.user, updates);
+		try {
+			await req.user.save();
+		} catch (error) {
+			if (error.code === 11000 && updates.email) {
+				return res.status(409).json({
+					message: "Email already registered",
+				});
+			}
+			throw error;
+		}
+
+		res.json({ user: pub(req.user) });
+	}),
+);
+
+// Change or set a password for the authenticated recruiter.
+router.patch(
+	"/me/password",
+	protect,
+	wrap(async (req, res) => {
+		if (req.user.role !== "recruiter") {
+			return res.status(403).json({
+				message: "Only recruiters can change passwords here",
+			});
+		}
+
+		const body =
+			req.body && typeof req.body === "object" ? req.body : {};
+		const newPassword = body.newPassword;
+		if (
+			typeof newPassword !== "string" ||
+			newPassword.length < 6 ||
+			Buffer.byteLength(newPassword, "utf8") > 72
+		) {
+			return res.status(400).json({
+				message: "New password must be at least 6 characters and no longer than 72 UTF-8 bytes",
+			});
+		}
+
+		const user = await User.findById(req.user._id).select("+passwordHash");
+		if (!user) {
+			return res.status(404).json({ message: "Account not found" });
+		}
+
+		if (
+			user.passwordHash &&
+			(typeof body.currentPassword !== "string" ||
+				!(await bcrypt.compare(body.currentPassword, user.passwordHash)))
+		) {
+			return res.status(401).json({
+				message: "Current password is incorrect",
+			});
+		}
+
+		user.passwordHash = await bcrypt.hash(newPassword, 10);
+		await user.save();
+
+		res.json({ message: "Password updated successfully." });
+	}),
+);
+
+// Close open jobs and remove the recruiter's account while retaining application history.
+router.delete(
+	"/me",
+	protect,
+	wrap(async (req, res) => {
+		if (req.user.role !== "recruiter") {
+			return res.status(403).json({
+				message: "Only recruiters can delete accounts here",
+			});
+		}
+
+		const body =
+			req.body && typeof req.body === "object" ? req.body : {};
+		const confirmationEmail =
+			typeof body.confirmationEmail === "string"
+				? body.confirmationEmail.trim().toLowerCase()
+				: "";
+		if (confirmationEmail !== req.user.email) {
+			return res.status(400).json({
+				message: "Enter your account email to confirm deletion",
+			});
+		}
+
+		const user = await User.findById(req.user._id).select("+passwordHash");
+		if (!user) {
+			return res.status(404).json({ message: "Account not found" });
+		}
+
+		if (
+			user.passwordHash &&
+			(typeof body.password !== "string" ||
+				!(await bcrypt.compare(body.password, user.passwordHash)))
+		) {
+			return res.status(401).json({
+				message: "Current password is incorrect",
+			});
+		}
+
+		await Job.updateMany(
+			{ recruiter: user._id, status: "open" },
+			{ $set: { status: "closed" } },
+		);
+		await RecruiterNote.deleteMany({ recruiter: user._id });
+		await Notification.deleteMany({ recipient: user._id });
+		await user.deleteOne();
+
+		res.json({
+			message: "Account deleted. Open jobs were closed and applications were preserved.",
+		});
+	}),
 );
 
 module.exports = router;

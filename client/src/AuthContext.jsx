@@ -11,10 +11,14 @@ export function AuthProvider({ children }) {
     localStorage.setItem('user', JSON.stringify(user));
     setUser(user);
   };
+  const updateUser = (nextUser) => {
+    localStorage.setItem('user', JSON.stringify(nextUser));
+    setUser(nextUser);
+  };
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
   };
-  return <Ctx.Provider value={{ user, login, logout }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ user, login, updateUser, logout }}>{children}</Ctx.Provider>;
 }
