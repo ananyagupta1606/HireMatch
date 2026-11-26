@@ -1,4 +1,5 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { useEffect } from "react";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "./AuthContext.jsx";
 import Navbar from "./components/Navbar.jsx";
 import Auth from "./pages/Auth.jsx";
@@ -33,12 +34,22 @@ function Guard({ role, children }) {
 	return children;
 }
 
+// Scroll to top on route changes
+function ScrollToTop() {
+	const { pathname } = useLocation();
+	useEffect(() => {
+		window.scrollTo(0, 0);
+	}, [pathname]);
+	return null;
+}
+
 export default function App() {
 	const { user } = useAuth();
 
 	return (
 		<>
 			<Navbar />
+			<ScrollToTop />
 
 			<main className="wrap">
 				<Routes>
