@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api, { errMsg } from '../api.js';
 
 const SKILL_CATEGORIES = {
@@ -47,6 +48,7 @@ export default function Profile() {
   const [msg, setMsg] = useState({ type: '', text: '' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const navigate = useNavigate();
   const [resume, setResume] = useState(null);
   const [selectedResume, setSelectedResume] = useState(null);
   const [uploadingResume, setUploadingResume] = useState(false);
@@ -167,6 +169,9 @@ export default function Profile() {
         type: 'ok',
         text: 'Profile saved successfully! Your job match scores are updated.',
       });
+
+      // Redirect to the jobs page after saving the profile
+      navigate('/');
     } catch (err) {
       setMsg({ type: 'error', text: errMsg(err) });
     } finally {
